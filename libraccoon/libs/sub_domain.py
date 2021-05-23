@@ -1,7 +1,7 @@
 import re
 from bs4 import BeautifulSoup
 from libraccoon.utils.request_handler import RequestHandler
-from libraccoon.lib.fuzzer import URLFuzzer
+from libraccoon.libs.fuzzer import URLFuzzer
 from libraccoon.utils.help_utils import HelpUtilities
 from libraccoon.utils.exceptions import RaccoonException
 from libraccoon.wordlists.wordlist_helper import get_file
@@ -80,7 +80,7 @@ class SubDomainEnumerator(object):
             hosts_table = soup.select(".table")[-1]
             for row in hosts_table.find_all("tr"):
                 tds = row.select("td")
-                sub_domain = tds[0].text.split('\n')[0]  # Grab just the URL, truncate other information
+                sub_domain = tds[0].text.split('\n')[0]  # Grab just the URL, truncate other information                
                 self.subdomainlist.append(sub_domain.lower())                
         except (RaccoonException, IndexError):
             print("Failed to query DNS dumpster for subdomains")

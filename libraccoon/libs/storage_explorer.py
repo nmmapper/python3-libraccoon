@@ -3,6 +3,7 @@ import xmltodict
 from libraccoon.utils.request_handler import RequestHandler
 from libraccoon.utils.exceptions import RaccoonException, RequestHandlerException
 from libraccoon.wordlists.wordlist_helper import get_file
+from bs4 import BeautifulSoup
 
 # Set path for relative access to builtin files.
 MY_PATH = os.path.abspath(os.path.dirname(__file__))
@@ -34,15 +35,25 @@ class Storage(object):
             url = "".join([part for part in url.split("//") if part])
             return HTTPS+url
 
-
+    
+    def setup(self):
+        session = self.request_handler.get_new_session()
+        response = session.get(
+            timeout=20,
+            url="{}://{}:{}".format(
+                self.host.protocol,
+                self.host.target,
+                self.host.port
+            )
+        )
+        return response 
+        
 # Is this a thing ??
 class AzureStorageHandler:
     pass
 
-
 class GoogleStorageHandler:
     pass
-
 
 class AmazonS3Handler(Storage):
 
@@ -151,7 +162,10 @@ class StorageExplorer(AmazonS3Handler, GoogleStorageHandler, AzureStorageHandler
                 # Cannot connect to storage, move on
                 pass
 
-    def run(self, soup):
+    def run(self):
+        response = self.setup()
+        soup = BeautifulSoup(response.text, "lxml")
+        
         img_srcs = self._get_image_sources_from_html(soup)
         # First validation
         urls = {src for src in img_srcs if self._is_s3_url(src)}
@@ -171,3 +185,5 @@ class StorageExplorer(AmazonS3Handler, GoogleStorageHandler, AzureStorageHandler
                 print("No sensitive files found in target's cloud storage")
             else:
                 print("Could not access target's cloud storage. All permissions are set properly")
+
+        

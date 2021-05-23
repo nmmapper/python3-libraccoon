@@ -2,11 +2,9 @@ import uuid
 from functools import partial
 from multiprocessing.pool import ThreadPool
 from requests.exceptions import ConnectionError
-from raccoon_src.utils.exceptions import FuzzerException, RequestHandlerException
-from raccoon_src.utils.request_handler import RequestHandler
-from raccoon_src.utils.help_utils import HelpUtilities
-from raccoon_src.utils.logger import Logger
-
+from libraccoon.utils.exceptions import FuzzerException, RequestHandlerException
+from libraccoon.utils.request_handler import RequestHandler
+from libraccoon.utils.help_utils import HelpUtilities
 # Really wanted to use Aiohttp, doesn't play nice with proxies or TOR, disconnects unexpectedly, etc.
 # Going threaded on this one
 

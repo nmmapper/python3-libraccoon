@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 from requests.exceptions import ConnectionError, TooManyRedirects
 from libraccoon.utils.web_server_validator import WebServerValidator
-from libraccoon.lib.storage_explorer import StorageExplorer
+from libraccoon.libs.storage_explorer import StorageExplorer
 from libraccoon.utils.request_handler import RequestHandler
 from libraccoon.utils.help_utils import HelpUtilities
 from libraccoon.utils.exceptions import WebAppScannerException, WebServerValidatorException

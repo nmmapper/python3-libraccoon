@@ -1,11 +1,11 @@
 import os
 from ipaddress import ip_address
 from dns.exception import Timeout
-from libraccoon.lib.dns_handler import DNSHandler
+from libraccoon.libs.dns_handler import DNSHandler
 from libraccoon.utils.exceptions import HostHandlerException
 from libraccoon.utils.help_utils import HelpUtilities
 
-class Host:
+class Host(object):
     """
     Host parsing, IP to host resolution (and vice verse), etc
     Sets domain/IP, port, protocol. also tries to parse FQDN, naked domain, if possible.
