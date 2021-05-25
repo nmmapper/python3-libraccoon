@@ -10,9 +10,12 @@ class Host(object):
     Host parsing, IP to host resolution (and vice verse), etc
     Sets domain/IP, port, protocol. also tries to parse FQDN, naked domain, if possible.
     """
-    def __init__(self, target, dns_records):
+    def __init__(self, target, dns_records=None):
         self.target = target.strip()
         self.dns_records = dns_records
+        if not self.dns_records:
+            self.dns_records = tuple("A,MX,NS,CNAME,SOA,TXT".split(","))
+            
         self.port = 80
         self.protocol = "http"
         self.is_ip = False
