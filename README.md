@@ -1,4 +1,5 @@
 
+
 # libraccoon
 
 libraccon a library for high performance offensive security tool for reconnaissance based on raccoon scanner. This library is based on Raccoon A high performance offensive security tool for reconnaissance and vulnerability scanning. The difference is we are providing a library to be used as a module.
@@ -63,3 +64,23 @@ subs.get_subdomains
  'www.nmmapper.com']
 ```
 Once again this is module type, can be used in any other external python programs
+
+## Querying virtualhost with bingip2host
+If you want to find which ips are hosted on the same network, you can use bingip2host, this tool still requires improvements.
+```py
+ip="172.67.209....." # CloudFlare
+from libraccoon.libs.bingip2host import BingIp2Host
+bing = BingIp2Host(ip)
+await bing.search()
+
+print(await bing.get_domains())
+[{'ip': '172.67.209....', 'domain': 'www.------.fi', 'source': 'bing'},
+ {'ip': '172.67.209....',
+  'domain': '-----.uk',
+  'source': 'bing'},
+  .......
+  # More results are hidden
+  .....
+]
+
+```

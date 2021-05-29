@@ -1,2 +1,3 @@
 aiodns
 python-whois
+httpx
