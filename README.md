@@ -1,5 +1,6 @@
 
 
+
 # libraccoon
 
 libraccon a library for high performance offensive security tool for reconnaissance based on raccoon scanner. This library is based on Raccoon A high performance offensive security tool for reconnaissance and vulnerability scanning. The difference is we are providing a library to be used as a module.
@@ -65,7 +66,7 @@ subs.get_subdomains
 ```
 Once again this is module type, can be used in any other external python programs
 
-## Querying virtualhost with bingip2host
+## Querying virtual-host with bingip2host
 If you want to find which ips are hosted on the same network, you can use bingip2host, this tool still requires improvements.
 ```py
 ip="172.67.209....." # CloudFlare
@@ -82,5 +83,23 @@ print(await bing.get_domains())
   # More results are hidden
   .....
 ]
+```
+### Querying Whois information
+This is how you can query whos information
+```py
+from libraccoon.libs.dns_handler import DNSHandler
+who = DNSHandler("nmmapper.com")
 
+# Registrar
+r = await who.grab_whois("nmmapper.com")
+{'domain_name': 'NMMAPPER.COM',
+ 'registrar': 'NameCheap, Inc.',
+ 'whois_server': 'whois.namecheap.com',
+#... More records truncated
+}
+
+# Querying invididual records
+txt = await who.query_dns("google.com", "TXT")
+A = await who.query_dns("google.com", "A")
+Ipv6 = await who.query_dns("google.com", "AAAA")
 ```
