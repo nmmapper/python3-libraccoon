@@ -4,7 +4,7 @@ import whois
 
 class DNSHandler(object):
     """Handles DNS queries and lookups"""
-    def __init__(self, host):
+    def __init__(self, host=None):
         self.host = host 
         self.results = {}
         self.resolver = aiodns.DNSResolver()

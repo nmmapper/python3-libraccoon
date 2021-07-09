@@ -7,8 +7,7 @@ from libraccoon.utils.request_handler import RequestHandler
 from libraccoon.utils.help_utils import HelpUtilities
 from libraccoon.utils.exceptions import WebAppScannerException, WebServerValidatorException
 
-
-class WebApplicationScanner:
+class WebApplicationScanner(object):
 
     def __init__(self, host):
         self.host = host
@@ -20,7 +19,8 @@ class WebApplicationScanner:
         self.fuzzable_urls = set()
         self.emails = set()
         self.storage_explorer = StorageExplorer(host)
-
+        self.results = {}
+        
     def _detect_cms(self, tries=0):
         """
         Detect CMS using whatcms.org.
@@ -69,48 +69,74 @@ class WebApplicationScanner:
 
     def _server_info(self):
         if self.headers.get("server"):
+            self.results["webserver"]=self.headers.get("server")
             print("Web server detected: {0}".format(self.headers.get("server")))
-
+        else:
+            self.results["webserver"]=""
+            
     def _x_powered_by(self):
         if self.headers.get("X-Powered-By"):
+            self.results["x_powered_by"]=self.headers.get("X-Powered-By")
             print("X-Powered-By header detected: {0}".format(self.headers.get("X-Powered-By")))
-
+        else:
+            self.results["x_powered_by"]=""
+            
     def _anti_clickjacking(self):
         if not self.headers.get("X-Frame-Options"):
+            self.results["x_frame_option"]=self.headers.get("X-Frame-Options")
             print("X-Frame-Options header not detected - target might be vulnerable to clickjacking")
-
+        else:
+            self.results["x_frame_option"]=self.headers.get("X-Frame-Options")
+            
     def _xss_protection(self):
         xss_header = self.headers.get("X-XSS-PROTECTION")
         if xss_header and "1" in xss_header:
             print("Found X-XSS-PROTECTION header")
-
+        self.results["x_xss_protection"]=self.headers.get("X-XSS-PROTECTION")
+        
     def _cors_wildcard(self):
         if self.headers.get("Access-Control-Allow-Origin") == "*":
             print("CORS wildcard detected")
-
+        self.results["access_control_llow_origin"]=self.headers.get("Access-Control-Allow-Origin")
+        
+    def get_robot_url(self):
+        return "{}://{}:{}/robots.txt".format(
+            self.host.protocol,
+            self.host.target,
+            self.host.port
+        )
+            
     def _robots(self):
+        url = self.get_robot_url()
+        
         res = self.request_handler.send(
             "GET",
-            url="{}://{}:{}/robots.txt".format(
-                self.host.protocol,
-                self.host.target,
-                self.host.port
-            )
+            url=url
         )
         if res.status_code != 404 and res.text and "<!DOCTYPE html>" not in res.text:
             print("Found robots.txt")
-
+            self.results["robot"]=url
+        else:
+            self.results["robot"]=""
+    
+    def get_sitemap_url(self):
+        return "{}://{}:{}/sitemap.xml".format(
+            self.host.protocol,
+            self.host.target,
+            self.host.port
+        )
     def _sitemap(self):
+        url = self.get_sitemap_url()
+        
         res = self.request_handler.send(
             "GET",
-            url="{}://{}:{}/sitemap.xml".format(
-                self.host.protocol,
-                self.host.target,
-                self.host.port
-            )
+            url=url
         )
         if res.status_code != 404 and res.text and "<!DOCTYPE html>" not in res.text:
-            print("Found sitemap.xml")
+            print("Found sitemap")
+            self.results["sitemap"]=url
+        else:
+            self.results["sitemap"]=""
 
     def _analyze_hrefs(self, href):
         if all(("?" in href, "=" in href, not href.startswith("mailto:"))):
@@ -191,7 +217,7 @@ class WebApplicationScanner:
                 soup = BeautifulSoup(response.text, "lxml")
                 self._find_urls(soup)
                 self._find_forms(soup)
-                self.storage_explorer.run(soup)
+                #self.storage_explorer.run(soup)
 
         except (ConnectionError, TooManyRedirects) as e:
             raise WebAppScannerException("Couldn't get response from server.\n"
@@ -205,3 +231,6 @@ class WebApplicationScanner:
         except WebServerValidatorException:
             print("Target does not seem to have an active web server on port: {0}.No web application data will be gathered.".format(self.host.port))
             return
+    
+    def get_results(self):
+        return self.results

@@ -108,7 +108,7 @@ Ipv6 = await who.query_dns("google.com", "AAAA")
 This module is a port of the fierce tool, we wanted something non commandline we wanted something that can be used as a module, so we had to re-write it to support being used as a module.
 
 ```py
-!/usr/bin/python3/
+#!/usr/bin/python3/
 #  Basic search
 from libraccoon.libs.fierce import LibFierce
 lib   = LibFierce("facebook.com")
@@ -125,7 +125,7 @@ The module is not yet fully complete.
 
 Traverse IPs near discovered domains to search for contiguous blocks
 ```py
-!/usr/bin/python3/
+#!/usr/bin/python3/
 #  Basic search
 from libraccoon.libs.fierce import LibFierce
 lib   = LibFierce("facebook.com")
