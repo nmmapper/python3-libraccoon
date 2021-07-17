@@ -13,9 +13,10 @@ BASE_S3_URL = "s3.amazonaws.com"
 
 class Storage(object):
 
-    def __init__(self, host):
+    def __init__(self, host, ua=None):
         self.host = host
-        self.request_handler = RequestHandler()
+        self.ua=ua
+        self.request_handler = RequestHandler(ua=self.ua)
         self.storage_urls_found = set()
         self.num_files_found = 0
         file_list_path = get_file("storage_sensitive")
@@ -35,7 +36,6 @@ class Storage(object):
             url = "".join([part for part in url.split("//") if part])
             return HTTPS+url
 
-    
     def setup(self):
         session = self.request_handler.get_new_session()
         response = session.get(
@@ -123,7 +123,6 @@ class S3Bucket(object):
         else:
             url = url.replace(HTTPS, "")
         return "".join([part for part in url.split("//") if part])
-
 
 class StorageExplorer(AmazonS3Handler, GoogleStorageHandler, AzureStorageHandler):
     """

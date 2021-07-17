@@ -6,10 +6,12 @@ import requests
 import random
 import bs4 
 import time
-import json
 import sys
 import re
 import os
+from libraccoon.utils.utils import get_user_agent
+import socket 
+
 class Request():
     def dns(target):
         try:
@@ -17,15 +19,15 @@ class Request():
         except:
             return []
 
-    def https(url):
-        headers = {"user-agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:89.0) Gecko/20100101 Firefox/89.0"}
+    def https(url, ua):
+        headers = {"user-agent": ua}
         try:
             resp = requests.get("https://"+url, headers=headers, timeout=5)
             return [resp.status_code, resp.headers["Server"] if "Server" in resp.headers.keys() else ""]
         except:
             return []
-    def http(url):
-        headers = {"user-agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:89.0) Gecko/20100101 Firefox/89.0"}
+    def http(url, ua):
+        headers = {"user-agent":ua}
         try:
             resp = requests.get("http://"+url, headers=headers, timeout=5)
             return [resp.status_code, resp.headers["Server"] if "Server" in resp.headers.keys() else ""]
@@ -43,17 +45,21 @@ class Request():
             for item in soup.find_all("a", href=True):
                 if item["href"].startswith("http") and item["href"].find(target) != -1 and item["href"].find("-site:") == -1:
                     match = re.match(pattern, item["href"])
-                    if match and re.match("^[a-zA-Z0-9-]*$", match.groups()[1]):                        
+                    if match and re.match("^[a-zA-Z0-9-]*$", match.groups()[1]):
                         subdomains.append(match.groups()[1])
         return list(dict.fromkeys(subdomains))
 
 class KnockPY(object):
-    def __init__(self, domain, wordlist=None, virustotalapi=None, discoveryapi=None):
+    def __init__(self, domain, wordlist=None, virustotalapi=None, discoveryapi=None, ua=None):
         self.domain = domain 
         self.wordlist = wordlist
         self.virustotalapi = virustotalapi
         self.discoveryapi = discoveryapi
+        self.ua=ua
         
+        if(not self.ua):
+            self.ua = get_user_agent()
+                
     def local(self):
         try:
             wlist = open(filename,'r').read().split("\n")
@@ -64,7 +70,7 @@ class KnockPY(object):
         return filter(None, wlist)
     
     def google(self):
-        headers = {"user-agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:89.0) Gecko/20100101 Firefox/89.0"}
+        headers = {"user-agent": self.ua}
         dork = "site:%s -site:www.%s" % (self.domain, self.domain)
         url = "https://google.com/search?q=%s&start=%s" % (dork, str(5))
         params = [self.domain, url, headers]
@@ -79,7 +85,7 @@ class KnockPY(object):
             return subdomains
 
     def duckduckgo(self):
-        headers = {"user-agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:89.0) Gecko/20100101 Firefox/89.0"}
+        headers = {"user-agent": self.ua}
         dork = "site:%s -site:www.%s" % (self.domain, self.domain)
         url = "https://duckduckgo.com/html/?q=%s" % dork
         params = [self.domain, url, headers]
@@ -91,7 +97,6 @@ class KnockPY(object):
                 subdomains.append(sub+"."+self.domain)
             return subdomains
         except Exception as e:
-            print("DUCK DUCK GO ERROR ", e)
             return subdomains
 
     def virustotal(self):
@@ -129,12 +134,10 @@ class KnockPY(object):
                     subdomains.append(subs+"."+subdomain_domain)
                 return subdomains 
             return []
-        except Exception as e:
-            print("DISCOVERY ERROR ", e)
-            
+        except Exception as e:            
             return []
             
-    def search(self):
+    def search(self, resolve=False, return_dict=True):
         subdomains = []
                 
         print("Searching google")
@@ -144,10 +147,37 @@ class KnockPY(object):
         print("Searching virustotal")
         subdomains += self.virustotal()
         print("project discovery")
+        
         subdomains += self.projectdiscovery()
+        subdomains = list(set(subdomains))
         
-        print(len(subdomains))
-        print(len(list(set(subdomains))))
+        if(resolve):
+            subdomain_list = []
+            for sub in subdomains:
+                subdomain_list.append({
+                    "host":self.domain,
+                    "subdomain":sub,
+                    "ip":self.get_ip(sub)
+                })
+            return subdomain_list
         
-        return list(set(subdomains))
+        # If the return should be dictionary
+        if(return_dict):
+            subdomain_list = []
+            for sub in subdomains:
+                subdomain_list.append({
+                    "host":self.domain,
+                    "subdomain":sub,
+                    "ip":""
+                })
+            return subdomain_list
         
+        # If neither resolve or return_dict, return the default
+        return subdomains
+        
+    def get_ip(self, sub):
+        """Return the IP"""
+        try:
+            return socket.gethostbyname(sub)
+        except socket.gaierror as e:
+            return ""

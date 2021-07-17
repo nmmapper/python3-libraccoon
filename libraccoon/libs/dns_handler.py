@@ -11,36 +11,34 @@ class DNSHandler(object):
         self.flags = 0
         self.flags = self.flags | whois.NICClient.WHOIS_QUICK
         
-    async def query_dns(self, domain, records):
+    async def query_dns(self, domain, record):
         """
         Query DNS records for host.
         :param domains: Iterable of domains to get DNS Records for
         :param records: Iterable of DNS records to get from domain.
         """
-        for record in records:
-            
-            try:
-                result = await self.resolver.query(domain, record)
-                if(record == "TXT"):
-                    self.results[record]=self.parse_txt(result)
-                    
-                elif(record == "SOA"):
-                    self.results[record]=self.parse_soa(result)
-                    
-                elif(record == "NS"):
-                    self.results[record]=self.parse_ns(result)
-                    
-                elif(record == "A"):
-                    self.results[record]=self.parse_ns(result)
-                    
-                elif(record == "MX"):
-                    self.results[record]=self.parse_ns(result)
-                    
-            except Exception as e:
-                print("ERROR ", e)
-                continue 
+        try:
+            self.results = {}
+            result = await self.resolver.query(domain, record)
+            if(record == "TXT"):
+                self.results[record]=self.parse_txt(result)
                 
-        return self.results
+            elif(record == "SOA"):
+                self.results[record]=self.parse_soa(result)
+                
+            elif(record == "NS"):
+                self.results[record]=self.parse_ns(result)
+                
+            elif(record == "A" or record == "AAAA"):
+                self.results[record]=self.parse_ns(result)
+                
+            elif(record == "MX"):
+                self.results[record]=self.parse_ns(result)
+                
+        except Exception as e:
+            print("ERROR ", e)
+        else:
+            return self.results
         
     def parse_ns(self, ns_record):
         """Naively parse ns records"""

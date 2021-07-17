@@ -3,6 +3,7 @@ from libraccoon.utils.web_server_validator import WebServerValidator
 from libraccoon.utils.exceptions import WAFException, WebServerValidatorException
 from libraccoon.utils.request_handler import RequestHandler
 from libraccoon.utils.help_utils import HelpUtilities
+import socket 
 
 SERVER = "Server"
 
@@ -66,10 +67,11 @@ class WAFApplicationMethods:
 
 class WAF(object):
 
-    def __init__(self, host):
+    def __init__(self, host, ua=None):
         self.host = host
         self.cnames = host.dns_results.get('CNAME')
-        self.request_handler = RequestHandler()
+        self.ua = ua
+        self.request_handler = RequestHandler(ua=self.ua)
         self.web_server_validator = WebServerValidator()
         self.waf_present = False
         self.waf_cname_map = {
@@ -93,6 +95,7 @@ class WAF(object):
         }
         
         self.waf_results = {}
+        
     def _waf_detected(self, name, where):
         print("Detected WAF presence in {0}:{1}".format(where,name))
         self.waf_results["waf"]=name 
@@ -139,5 +142,14 @@ class WAF(object):
     
     @property
     def get_waf(self):
+        self.waf_results["ip"]=self.get_ip(self.host.target)
+        self.waf_results["host"]=self.host.target
+        self.waf_results["asn"]=""
         return self.waf_results
         
+    def get_ip(self, host):
+        """Return IP"""
+        try:
+            return socket.gethostbyname(host)
+        except socket.gaierror as e:
+            return ""

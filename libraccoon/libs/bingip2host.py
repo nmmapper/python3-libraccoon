@@ -7,10 +7,8 @@ import asyncio
 from libraccoon.utils.utils import get_user_agent
 
 class BingIp2Host(object):
-    """
-    Performs virtualhost searching
-    """
-    def __init__(self, ip):
+    """Performs virtualhost searching"""
+    def __init__(self, ip, ua=None):
         self.url = "https://www.bing.com/search"
         self.domain = "https://www.bing.com"
         self.ip = ip
@@ -20,7 +18,10 @@ class BingIp2Host(object):
         self.lang = "en-us"
         self.prefix = "ip"
         self.param = self.set_param()
-        self.ua = get_user_agent()
+        self.ua = ua
+        if(not self.ua):
+            self.ua = get_user_agent()
+                
         self.next_pages = list()
         self.hosts = list() # were we shall store
         self.headers = {"User-Agent":self.ua}

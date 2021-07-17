@@ -66,9 +66,7 @@ class Host(object):
         return
 
     async def parse(self):
-        """
-        Try to extract domain (full, naked, sub-domain), IP and port.
-        """
+        """Try to extract domain (full, naked, sub-domain), IP and port."""
         if self.target.endswith("/"):
             self.target = self.target[:-1]
 

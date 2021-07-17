@@ -95,9 +95,9 @@ class WhatWeb(object):
                 return json.loads(whatweb_output, encoding = 'utf-8')
             except json.JSONDecodeError as e:
                 print("JSON DECODE ERROR", e)
-                return {}
+                return [{}]
             except:
-                raise
+                return [{}]
        
     def _get_scan_args(self, targets, arguments):
         assert isinstance(targets, (str, collections.Iterable)), 'Wrong type for [hosts], should be a string or Iterable [was {0}]'.format(type(targets))

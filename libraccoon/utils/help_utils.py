@@ -157,7 +157,6 @@ class HelpUtilities:
             ret = dnsdumpster_session.post(url, data=payload, headers={"Referer": "https://dnsdumpster.com/"})
             return ret
             
-            #return dnsdumpster_session.get("https://dnsdumpster.com/static/map/{}.png".format(target))
         except ConnectionError as e:
             raise RaccoonException
 

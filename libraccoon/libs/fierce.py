@@ -186,7 +186,6 @@ class LibFierce(object):
             for k, v in reversed_ips.items()
             if v is not None and filter_func(v[0].to_text())
         }
-
         return reversed_ips
 
     def get_stripped_file_lines(self, filename):
@@ -238,10 +237,3 @@ class LibFierce(object):
     def get_domain_text(self):
         return dns.name.from_text(self.domain)
         
-def main(): 
-    lib   = LibFierce("facebook.com")
-    ret = lib.search("www", 50)
-    print(json.dumps(ret, indent=4, sort_keys=True))
-    
-if __name__ == "__main__":
-    main()

@@ -11,11 +11,12 @@ from libraccoon.utils.help_utils import HelpUtilities
 class URLFuzzer(object):
 
     def __init__(self,
-                 host,
-                 ignored_response_codes,
-                 num_threads,
-                 path_to_wordlist,
-                 follow_redirects=False):
+                host,
+                ignored_response_codes,
+                num_threads,
+                path_to_wordlist,
+                follow_redirects=False,
+                ua="Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:89.0) Gecko/20100101 Firefox/89.0"):
 
         self.target = host.target
         self.ignored_error_codes = ignored_response_codes
@@ -25,7 +26,7 @@ class URLFuzzer(object):
         self.path_to_wordlist = path_to_wordlist
         self.wordlist = self._create_set_from_wordlist_file(path_to_wordlist)
         self.follow_redirects = follow_redirects
-        self.request_handler = RequestHandler()  # Will get the single, already initiated instance
+        self.request_handler = RequestHandler(ua=ua)  # Will get the single, already initiated instance
 
     @staticmethod
     def _create_set_from_wordlist_file(wordlist):
@@ -61,7 +62,7 @@ class URLFuzzer(object):
         try:
             res = self.request_handler.send("HEAD", url=url, allow_redirects=self.follow_redirects)
             if res.status_code not in self.ignored_error_codes:
-                print(res.status_code, url, res.headers)
+                print("sub_domain", uri)
         except (AttributeError, RequestHandlerException):
             # res is None or another error occurred
             pass
@@ -96,7 +97,7 @@ class URLFuzzer(object):
                                           " Maybe target is down ?".format(self.target))
         return response_codes
 
-    async def fuzz_all(self, sub_domain=False, log_file_path=None):
+    def fuzz_all(self, sub_domain=False, log_file_path=None):
         """
         Create a pool of threads and exhaust self.wordlist on self._fetch
         Should be run in an event loop.

@@ -9,9 +9,10 @@ from libraccoon.utils.exceptions import WebAppScannerException, WebServerValidat
 
 class WebApplicationScanner(object):
 
-    def __init__(self, host):
+    def __init__(self, host, ua=None):
         self.host = host
-        self.request_handler = RequestHandler()
+        self.ua=ua
+        self.request_handler = RequestHandler(ua=self.ua)
         self.web_server_validator = WebServerValidator()
         self.headers = None
         self.robots = None

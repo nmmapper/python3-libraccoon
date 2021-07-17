@@ -1,15 +1,13 @@
 import os
 import sys
 from os.path import dirname
-sys.path.append("/home/nmmapper/Templates/dev/GitHub/raccoon")
-
 import random
-from fake_useragent import UserAgent
 from requests import request, Session, utils as requests_utils
 from requests.exceptions import ProxyError, TooManyRedirects, ConnectionError, ConnectTimeout, ReadTimeout
 from urllib3.exceptions import NewConnectionError
 from libraccoon.utils.exceptions import RequestHandlerException
 from libraccoon.utils.singleton import Singleton
+from libraccoon.utils.utils import get_user_agent
 
 class RequestHandler(metaclass=Singleton):
     """
@@ -17,11 +15,12 @@ class RequestHandler(metaclass=Singleton):
     Used to abstract proxy/tor routing to avoid repeating configurations for each module
     """
     def __init__(self,
-                 proxy_list=None,
-                 tor_routing=False,
-                 single_proxy=None,
-                 delay=None,
-                 cookies=None):
+                proxy_list=None,
+                tor_routing=False,
+                single_proxy=None,
+                delay=None,
+                cookies=None,
+                ua=None):
         self.proxy_list = proxy_list
         self.tor_routing = tor_routing
         self.delay = delay
@@ -29,12 +28,17 @@ class RequestHandler(metaclass=Singleton):
         self.proxies = self._set_instance_proxies()
         self.cookies = cookies
         self.allowed_methods = {"GET", "HEAD", "POST"}
+        
+        self.ua = ua
+        if(not self.ua):
+            self.ua = get_user_agent()
+        
         self.headers = self._set_headers()
-
-    @staticmethod
-    def _set_headers():
+        
+    def _set_headers(self):
+        print("UA ", self.ua)
         headers = requests_utils.default_headers()
-        headers["User-Agent"] = UserAgent(verify_ssl=False).random
+        headers["User-Agent"] = self.ua
         return headers
 
     def _set_instance_proxies(self):

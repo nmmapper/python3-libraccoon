@@ -1,3 +1,8 @@
 aiodns
 python-whois
 httpx
+beautifulsoup4
+dnspython
+requests
+ipaddress
+xmltodict
