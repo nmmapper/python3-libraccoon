@@ -14,10 +14,6 @@ import dns.zone
 import json
 from dns.resolver import Resolver
 
-def fatal(msg, return_code=-1):
-    print(msg)
-    exit(return_code)
-
 class LibFierce(object):
     def __init__(self, domain, resolver=None):
         self.resolver = resolver
@@ -149,7 +145,7 @@ class LibFierce(object):
         try:
             network = ipaddress.IPv4Network(ip)
         except ipaddress.AddressValueError:
-            fatal("Invalid IPv4 CIDR: {!r}".format(ip))
+            print("Invalid IPv4 CIDR: {0}".format(ip))
 
         result = list(network)
 
@@ -195,7 +191,7 @@ class LibFierce(object):
         try:
             lines = open(filename).readlines()
         except FileNotFoundError:
-            fatal("Could not open file: {!r}".format(filename))
+            print("Could not open file: {0}".format(filename))
 
         return [line.strip() for line in lines]
 

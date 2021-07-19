@@ -6,3 +6,5 @@ dnspython
 requests
 ipaddress
 xmltodict
+geoip2
+httpx

@@ -142,10 +142,11 @@ class HelpUtilities:
             target = host.target
         payload = {
             "targetip": target,
-            "csrfmiddlewaretoken": None
+            "csrfmiddlewaretoken": None,
+            "user":"free"
         }
         try:
-            dnsdumpster_session.get(url, timeout=10)
+            dnsdumpster_session.get(url)
             jar = dnsdumpster_session.cookies
             
             for c in jar:
@@ -153,7 +154,7 @@ class HelpUtilities:
                     continue
                 payload["csrfmiddlewaretoken"] = c.__dict__.get("value")
                 break
-            
+         
             ret = dnsdumpster_session.post(url, data=payload, headers={"Referer": "https://dnsdumpster.com/"})
             return ret
             

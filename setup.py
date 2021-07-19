@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="python3-libraccoon", 
-    version="1.0.0",
+    version="1.1.0",
     author="nmmapper",
     author_email="inquiry@nmmapper.com",
     description="libraccon a library for high performance offensive security tool for reconnaissance based on raccoon scanner. This include performing DNS reconnaissance ",
@@ -26,5 +26,6 @@ setuptools.setup(
     python_requires='>=3.6',
     setup_requires=['wheel'],
     install_requires=['simplejson', "aiodns", "python-whois", "httpx", "beautifulsoup4",
-                     "dnspython", "requests", "ipaddress", "xmltodict"],
+                     "dnspython", "requests", "ipaddress", "xmltodict", "geoip2", "httpx",
+                     "aiodns"],
 )

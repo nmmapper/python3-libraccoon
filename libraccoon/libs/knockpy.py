@@ -2,7 +2,7 @@
 
 from os import path
 import socket
-import requests
+import httpx
 import random
 import bs4 
 import time
@@ -11,6 +11,8 @@ import re
 import os
 from libraccoon.utils.utils import get_user_agent
 import socket 
+from libraccoon.utils.utils import get_asn
+from libraccoon.utils.utils import get_ips
 
 class Request():
     def dns(target):
@@ -50,13 +52,19 @@ class Request():
         return list(dict.fromkeys(subdomains))
 
 class KnockPY(object):
-    def __init__(self, domain, wordlist=None, virustotalapi=None, discoveryapi=None, ua=None):
+    def __init__(self, domain, wordlist=None, 
+                    virustotalapi=None, 
+                    discoveryapi=None, 
+                    securitytrail=None,
+                    ua=None):
+                        
         self.domain = domain 
         self.wordlist = wordlist
         self.virustotalapi = virustotalapi
         self.discoveryapi = discoveryapi
+        self.securitytrail = securitytrail
         self.ua=ua
-        
+        self.timeout = 10
         if(not self.ua):
             self.ua = get_user_agent()
                 
@@ -64,12 +72,12 @@ class KnockPY(object):
         try:
             wlist = open(filename,'r').read().split("\n")
         except:
-            _ROOT = os.path.abspath(os.path.dirname(__file__))
+            ROOT = os.path.abspath(os.path.dirname(__file__))
             filename = os.path.join(_ROOT, "", filename)
             wlist = open(filename,'r').read().split("\n")
         return filter(None, wlist)
     
-    def google(self):
+    async def google(self):
         headers = {"user-agent": self.ua}
         dork = "site:%s -site:www.%s" % (self.domain, self.domain)
         url = "https://google.com/search?q=%s&start=%s" % (dork, str(5))
@@ -84,7 +92,7 @@ class KnockPY(object):
         except Exception as e:
             return subdomains
 
-    def duckduckgo(self):
+    async def duckduckgo(self):
         headers = {"user-agent": self.ua}
         dork = "site:%s -site:www.%s" % (self.domain, self.domain)
         url = "https://duckduckgo.com/html/?q=%s" % dork
@@ -99,15 +107,19 @@ class KnockPY(object):
         except Exception as e:
             return subdomains
 
-    def virustotal(self):
+    async def virustotal(self):
         try:
             if not self.virustotalapi: 
                 return []
                 
             url = "https://www.virustotal.com/vtapi/v2/domain/report"
             params = {"apikey": self.virustotalapi,"domain": self.domain}
-            resp = requests.get(url, params=params)
-            resp = resp.json()
+            resp = {} 
+            
+            async with httpx.AsyncClient() as client:
+                req = await client.get(url, params=params, timeout=self.timeout)
+                resp = req.json()
+                
             subdomains = resp.get("subdomains", [])        
             return subdomains
             
@@ -115,49 +127,95 @@ class KnockPY(object):
             print("virustotalO ERROR ", e)
             return []
             
-    def projectdiscovery(self):
+    async def projectdiscovery(self):
         try:
             if not self.discoveryapi:
                 return [] 
                 
             headers = {"Authorization":self.discoveryapi}
             url="https://dns.projectdiscovery.io/dns/{domain}/subdomains".format(domain=self.domain)
-            resp = requests.get(url, headers=headers)
+            resp = None
+            
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(url, headers=headers, timeout=self.timeout)
+                
             subdomains = []
             
-            if(resp.status_code == 200):
-                data = resp.json()
-                subdomain_data = data.get("subdomains")
-                subdomain_domain = data.get("domain")
-                
-                for subs in subdomain_data:
-                    subdomains.append(subs+"."+subdomain_domain)
-                return subdomains 
+            if(resp is not None):
+                if(resp.status_code == 200):
+                    data = resp.json()
+                    subdomain_data = data.get("subdomains")
+                    subdomain_domain = data.get("domain")
+                    
+                    for subs in subdomain_data:
+                        subdomains.append(subs+"."+subdomain_domain)
+                    return subdomains 
             return []
         except Exception as e:            
             return []
             
-    def search(self, resolve=False, return_dict=True):
-        subdomains = []
+    async def securitytrails(self):
+        try:
+            if not self.securitytrail:
+                return [] 
                 
-        print("Searching google")
-        subdomains += self.google()
-        print("Searching duckduck go")
-        subdomains += self.duckduckgo()
+            querystring = {"children_only":"false","include_inactive":"true"}
+            headers = {"Accept": "application/json", "apikey":self.securitytrail}
+            url = "https://api.securitytrails.com/v1/domain/{domain}/subdomains".format(domain=self.domain)
+            resp = None
+            
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(url, headers=headers, params=querystring, timeout=self.timeout)
+                        
+            subdomains = []
+            
+            if(resp is not None):
+                if(resp.status_code == 200):
+                    data = resp.json()
+                    subdomain_data = data.get("subdomains")
+                    
+                    for subs in subdomain_data:
+                        subdomains.append(subs+"."+self.domain)
+                    return subdomains
+                   
+            return []
+        except Exception as e:
+            return []
+            
+    async def search(self, resolve=False, return_dict=True):
+        subdomains = []
+
         print("Searching virustotal")
-        subdomains += self.virustotal()
-        print("project discovery")
+        subdomains += await self.virustotal()
         
-        subdomains += self.projectdiscovery()
+        print("project discovery")
+        subdomains += await self.projectdiscovery()
+        
+        print("project securitytrails")
+        subdomains += await self.securitytrails()
+        
         subdomains = list(set(subdomains))
         
         if(resolve):
             subdomain_list = []
             for sub in subdomains:
+                ip = ""
+                
+                ip_results = await get_ips(sub)
+                if(ip_results):
+                    ip = ip_results[0].get("a_ip")
+                     
+                asn = ""
+                if(ip):
+                    asn_ojb = get_asn(ip)
+                    if asn_ojb:
+                        asn = asn_ojb.autonomous_system_organization
+                    
                 subdomain_list.append({
                     "host":self.domain,
                     "subdomain":sub,
-                    "ip":self.get_ip(sub)
+                    "ip":ip,
+                    "asn":asn
                 })
             return subdomain_list
         
@@ -175,9 +233,3 @@ class KnockPY(object):
         # If neither resolve or return_dict, return the default
         return subdomains
         
-    def get_ip(self, sub):
-        """Return the IP"""
-        try:
-            return socket.gethostbyname(sub)
-        except socket.gaierror as e:
-            return ""

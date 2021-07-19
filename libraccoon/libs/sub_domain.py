@@ -30,7 +30,7 @@ class SubDomainEnumerator(object):
         
         self.subdomainlist = []
         
-    def run(self):
+    async def run(self):
         print("Enumerating Subdomains")
         if self.sans:
             self._extract_from_sans()
@@ -58,11 +58,10 @@ class SubDomainEnumerator(object):
         print("Trying to extract subdomains from DNS dumpster")
         try:
             page = HelpUtilities.query_dns_dumpster(host=self.host)
-            
             reg_hosts = re.compile(r'[a-zA-Z0-9.-]*\.' + self.host.target)
             results = reg_hosts.findall(page.text)
-            subdomains = self.unique(results)
-            return subdomains
+            self.subdomainlist = self.unique(results)
+            return self.subdomainlist
         
         except (RaccoonException, IndexError):
             print("Failed to query DNS dumpster for subdomains")
