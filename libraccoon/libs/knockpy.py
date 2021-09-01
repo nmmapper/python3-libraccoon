@@ -1,55 +1,8 @@
 #!/usr/bin/python3
-
-from os import path
-import socket
 import httpx
-import random
-import bs4 
-import time
-import sys
-import re
-import os
 from libraccoon.utils.utils import get_user_agent
-import socket 
 from libraccoon.utils.utils import get_asn
 from libraccoon.utils.utils import get_ips
-
-class Request():
-    def dns(target):
-        try:
-            return socket.gethostbyname_ex(target)
-        except:
-            return []
-
-    def https(url, ua):
-        headers = {"user-agent": ua}
-        try:
-            resp = requests.get("https://"+url, headers=headers, timeout=5)
-            return [resp.status_code, resp.headers["Server"] if "Server" in resp.headers.keys() else ""]
-        except:
-            return []
-    def http(url, ua):
-        headers = {"user-agent":ua}
-        try:
-            resp = requests.get("http://"+url, headers=headers, timeout=5)
-            return [resp.status_code, resp.headers["Server"] if "Server" in resp.headers.keys() else ""]
-        except:
-            return []
-
-    def bs4scrape(params):
-        target, url, headers = params
-        resp = requests.get(url, headers=headers, timeout=5)
-        
-        pattern = "http(s)?:\/\/(.*)\.%s" % target
-        subdomains = []
-        if resp.status_code == 200:
-            soup = bs4.BeautifulSoup(resp.text, "html.parser")
-            for item in soup.find_all("a", href=True):
-                if item["href"].startswith("http") and item["href"].find(target) != -1 and item["href"].find("-site:") == -1:
-                    match = re.match(pattern, item["href"])
-                    if match and re.match("^[a-zA-Z0-9-]*$", match.groups()[1]):
-                        subdomains.append(match.groups()[1])
-        return list(dict.fromkeys(subdomains))
 
 class KnockPY(object):
     def __init__(self, domain, wordlist=None, 
@@ -68,45 +21,6 @@ class KnockPY(object):
         if(not self.ua):
             self.ua = get_user_agent()
                 
-    def local(self):
-        try:
-            wlist = open(filename,'r').read().split("\n")
-        except:
-            ROOT = os.path.abspath(os.path.dirname(__file__))
-            filename = os.path.join(_ROOT, "", filename)
-            wlist = open(filename,'r').read().split("\n")
-        return filter(None, wlist)
-    
-    async def google(self):
-        headers = {"user-agent": self.ua}
-        dork = "site:%s -site:www.%s" % (self.domain, self.domain)
-        url = "https://google.com/search?q=%s&start=%s" % (dork, str(5))
-        params = [self.domain, url, headers]
-        
-        subdomains = []
-        try:
-            subs =  Request.bs4scrape(params)
-            for sub in subs:
-                subdomains.append(sub+"."+self.domain)
-            return subdomains
-        except Exception as e:
-            return subdomains
-
-    async def duckduckgo(self):
-        headers = {"user-agent": self.ua}
-        dork = "site:%s -site:www.%s" % (self.domain, self.domain)
-        url = "https://duckduckgo.com/html/?q=%s" % dork
-        params = [self.domain, url, headers]
-        
-        subdomains = []
-        try:
-            subs =  Request.bs4scrape(params)
-            for sub in subs:
-                subdomains.append(sub+"."+self.domain)
-            return subdomains
-        except Exception as e:
-            return subdomains
-
     async def virustotal(self):
         try:
             if not self.virustotalapi: 

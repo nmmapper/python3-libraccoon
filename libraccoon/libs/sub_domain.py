@@ -7,6 +7,8 @@ from libraccoon.utils.exceptions import RaccoonException
 from libraccoon.wordlists.wordlist_helper import get_file
 import socket 
 import re
+from libraccoon.utils.utils import get_asn
+from libraccoon.utils.utils import get_ips
 
 class SubDomainEnumerator(object):
 
@@ -38,7 +40,29 @@ class SubDomainEnumerator(object):
         if not self.no_sub_enum:
             self.bruteforce()
         print("Done enumerating Subdomains")
-
+        
+        subdomain_list = []
+        for sub in self.subdomainlist:
+            ip = ""
+                
+            ip_results = await get_ips(sub)
+            if(ip_results):
+                ip = ip_results[0].get("a_ip")
+                 
+            asn = ""
+            if(ip):
+                asn_ojb = get_asn(ip)
+                if asn_ojb:
+                    asn = asn_ojb.autonomous_system_organization
+                        
+            subdomain_list.append({
+                "host":self.host.target,
+                "subdomain":sub,
+                "ip":ip,
+                "asn":asn
+            })
+        return subdomain_list
+        
     def _extract_from_sans(self):
         """Looks for different TLDs as well as different sub-domains in SAN list"""
         print("{} Trying to find Subdomains in SANs list")
@@ -88,22 +112,3 @@ class SubDomainEnumerator(object):
     def get_subdomains(self):
         return self.subdomainlist
         
-    @property
-    def get_resolved_subdomains(self):
-        """Resolve subdomains to ip"""
-        subdomain_list = []
-        for sub in self.subdomainlist:
-            subdomain_list.append({
-                "host":self.host.target,
-                "subdomain":sub,
-                "ip":self.get_ip(sub),
-                "asn":""
-            })
-        return subdomain_list
-    
-    def get_ip(self, sub):
-        """Return the IP"""
-        try:
-            return socket.gethostbyname(sub)
-        except socket.gaierror as e:
-            return ""
