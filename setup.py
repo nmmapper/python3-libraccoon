@@ -25,7 +25,15 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     setup_requires=['wheel'],
-    install_requires=['simplejson', "aiodns", "python-whois", "httpx", "beautifulsoup4",
-                     "dnspython", "requests", "ipaddress", "xmltodict", "geoip2", "httpx",
-                     "aiodns"],
+    install_requires=[
+        "aiodns",
+        "beautifulsoup4",
+        "dnspython",
+        "geoip2",
+        "httpx",
+        "python-whois",
+        "requests",
+        "simplejson",
+        "xmltodict",
+    ],
 )
