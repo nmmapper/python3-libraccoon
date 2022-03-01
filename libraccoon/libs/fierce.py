@@ -33,32 +33,6 @@ class LibFierce(object):
 
         return inner
 
-    def find_subdomain_list_file(self, filename):
-        # First check the list directory relative to where we are. This
-        # will typically happen if they simply cloned the Github repository
-        filename_path = os.path.join(os.path.dirname(__file__), "lists", filename)
-        if os.path.exists(filename_path):
-            return os.path.abspath(filename_path)
-
-        try:
-            import pkg_resources
-        except ImportError:
-            return filename
-
-        # If the relative check failed then attempt to find the list file
-        # in the pip package directory. This will typically happen on pip package
-        # installs (duh)
-        package_filename_path = os.path.join("lists", filename)
-        try:
-            full_package_path = pkg_resources.resource_filename(
-                "fierce",
-                package_filename_path
-            )
-        except ImportError:
-            return filename
-
-        return full_package_path
-
     def concatenate_subdomains(self, domain, subdomains):
         subdomains = [
             nested_subdomain
@@ -96,6 +70,9 @@ class LibFierce(object):
             return None
 
     def reverse_query(self, ip, tcp=False):
+        print("IP ", ip)
+        print("TCP ", tcp)
+        
         return self.query(dns.reversename.from_address(ip), record_type='PTR', tcp=tcp)
 
     def recursive_query(self, domain, record_type='NS', tcp=False):
@@ -162,9 +139,11 @@ class LibFierce(object):
             filter_func = self.default_filter
 
         str_ips = [str(ip) for ip in ips]
-        
         max_workers = multiprocessing.cpu_count() * 5
-
+        
+        print("self.reverse_query ",self.reverse_query)
+        print("self.str_ips ",str_ips)
+        
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             reversed_ips = {
                 ip: query_result
@@ -176,7 +155,9 @@ class LibFierce(object):
                     )
                 )
             }
-
+        
+        print("reversed_ips",reversed_ips)
+        
         reversed_ips = {
             k: v[0].to_text()
             for k, v in reversed_ips.items()
@@ -211,7 +192,11 @@ class LibFierce(object):
         """Search"""
         domain = self.get_domain_text()
         url = self.concatenate_subdomains(domain, [subdomain])
+        print("URL ", url)
+        print("\n")
         record = self.query(url, record_type='A', tcp=False)
+        print("Record", record)
+        print("\n")
         
         if record is None or record.rrset is None:
             return []
@@ -227,7 +212,14 @@ class LibFierce(object):
         unvisited = self.unvisited_closure()
         unvisited_ips = unvisited(ips)
         
+        print("UNVISITED ", unvisited)
+        print("\n")
+        print("UNVISITED IP", unvisited_ips)
+        
+        print("\n")
         nearby = self.find_nearby(unvisited_ips, None)
+        print("Nearby", nearby)
+        print("\n")
         return nearby
                 
     def get_domain_text(self):

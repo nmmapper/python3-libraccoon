@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+
 import httpx
 from libraccoon.utils.utils import get_user_agent
 from libraccoon.utils.utils import get_asn
@@ -17,10 +18,35 @@ class KnockPY(object):
         self.discoveryapi = discoveryapi
         self.securitytrail = securitytrail
         self.ua=ua
-        self.timeout = 10
+        self.timeout = 50
+        
         if(not self.ua):
             self.ua = get_user_agent()
+    
+    async def bufferover_run(self):
+        try:
+            print("Searching using bufferoverrun")
+            
+            url = "https://dns.bufferover.run/dns?q={domain}".format(domain=self.domain)
+            resp = {} 
+            subdomains = []
+            
+            async with httpx.AsyncClient() as client:
+                req = await client.get(url, timeout=self.timeout)
+                resp = req.json()
                 
+            FDNS_A = req.json().get("FDNS_A")
+            for fdns in FDNS_A:
+                if("," in fdns):
+                    sub = fdns.split(",")[-1]
+                    subdomains.append(sub)
+                else:
+                    subdomains.append(fdns)
+            return list(set(subdomains))
+            
+        except Exception as e:
+            return []
+            
     async def virustotal(self):
         try:
             if not self.virustotalapi: 
@@ -38,7 +64,6 @@ class KnockPY(object):
             return subdomains
             
         except Exception as e:
-            print("virustotalO ERROR ", e)
             return []
             
     async def projectdiscovery(self):
@@ -65,7 +90,7 @@ class KnockPY(object):
                         subdomains.append(subs+"."+subdomain_domain)
                     return subdomains 
             return []
-        except Exception as e:            
+        except Exception as e:
             return []
             
     async def securitytrails(self):
@@ -108,11 +133,14 @@ class KnockPY(object):
         print("project securitytrails")
         subdomains += await self.securitytrails()
         
-        subdomains = list(set(subdomains))
+        print("project bufferover_run")
+        subdomains += await self.bufferover_run()
         
+        subdomains_generator = (sub for sub in list(set(subdomains)))
+                
         if(resolve):
             subdomain_list = []
-            for sub in subdomains:
+            for sub in subdomains_generator:
                 ip = ""
                 
                 ip_results = await get_ips(sub)
@@ -135,14 +163,16 @@ class KnockPY(object):
         
         # If the return should be dictionary
         if(return_dict):
-            subdomain_list = []
-            for sub in subdomains:
-                subdomain_list.append({
+            subdomain = []
+            
+            for sub in subdomains_generator:
+                subdomain.append({
                     "host":self.domain,
                     "subdomain":sub,
-                    "ip":""
+                    "ip":"",
+                    "asn":""
                 })
-            return subdomain_list
+            return subdomain
         
         # If neither resolve or return_dict, return the default
         return subdomains
