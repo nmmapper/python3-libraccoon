@@ -7,7 +7,7 @@ import socket
 
 SERVER = "Server"
 
-class WAFApplicationMethods:
+class WAFApplicationMethods(object):
 
     @classmethod
     def detect_cloudfront(cls, res):
@@ -112,10 +112,9 @@ class WAF(object):
             response = session.get(
                 timeout=20,
                 allow_redirects=True,
-                url="{}://{}:{}".format(
+                url="{}://{}".format(
                     self.host.protocol,
                     self.host.target,
-                    self.host.port
                 )
             )
             for waf, method in self.waf_app_method_map.items():
@@ -137,8 +136,9 @@ class WAF(object):
 
             if not self.waf_present:
                 print("Did not detect WAF presence in target")
-        except WebServerValidatorException:
-            print("Failed!")
+        except WebServerValidatorException as e:
+            raise 
+            #print("Failed!")
     
     @property
     def get_waf(self):

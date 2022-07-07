@@ -89,12 +89,14 @@ class RequestHandler(metaclass=Singleton):
         Send a GET/POST/HEAD request using the object's proxies and headers
         :param method: Method to send request in. GET/POST/HEAD
         """
-        proxies = self._get_request_proxies()
 
         try:
+            print(args)
+            print(kwargs)
+            print(self.headers)
             if method.upper() in self.allowed_methods:
                 kwargs['timeout'] = kwargs['timeout'] if 'timeout' in kwargs else 5
-                return request(method, proxies=proxies, headers=self.headers, cookies=self.cookies, *args, **kwargs)
+                return request(method, headers=self.headers, cookies=self.cookies, *args, **kwargs)
             else:
                 raise RequestHandlerException("Unsupported method: {}".format(method))
         except ProxyError:
@@ -118,5 +120,5 @@ class RequestHandler(metaclass=Singleton):
         """Returns a new session using the object's proxies and headers"""
         session = Session()
         session.headers = self.headers
-        session.proxies = self._get_request_proxies()
+        #session.proxies = self._get_request_proxies()
         return session

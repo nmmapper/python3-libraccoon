@@ -17,7 +17,7 @@ class Host(object):
             self.dns_records = tuple("A,MX,NS,CNAME,SOA,TXT".split(","))
             
         self.port = 80
-        self.protocol = "http"
+        self.protocol = "https"
         self.is_ip = False
         self.fqdn = None
         self.naked = None
