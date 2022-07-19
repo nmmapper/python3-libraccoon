@@ -4,9 +4,9 @@ import os
 import re
 import shlex
 import subprocess
+import asyncio 
 
 _VersionInfo = collections.namedtuple("WhatWebVersion", ['major', 'minor', 'micro'])
-
 _whatweb_search_path = ('/usr/bin/whatweb', '/usr/local/bin/whatweb', '/opt/local/bin/whatweb')
 
 regex_warning = re.compile('^Warning: .*', re.IGNORECASE)
@@ -100,8 +100,7 @@ class WhatWeb(object):
                 return [{}]
        
     def _get_scan_args(self, targets, arguments):
-        assert isinstance(targets, (str, collections.Iterable)), 'Wrong type for [hosts], should be a string or Iterable [was {0}]'.format(type(targets))
-        assert isinstance(arguments, (str, type(None))), 'Wrong type for [arguments], should be a string [was {0}]'.format(type(arguments))  # noqa
+        assert isinstance(targets, (str, list)), 'Wrong type for [hosts], should be a string or Iterable [was {0}]'.format(type(targets))
         
         if not isinstance(targets, str):
             targets = ' '.join(targets)
@@ -110,13 +109,11 @@ class WhatWeb(object):
             scan_args = shlex.split(arguments)
         else:
             scan_args = []
-        targets_args = shlex.split(targets)
+        targets_args = shlex.split(targets)        
         return ['--log-json=-', '-q'] + targets_args + scan_args
     
 class WhatWebError(Exception):
-    """
-    Exception error class for WhatWeb class
-    """
+    """Exception error class for WhatWeb class"""
     def __init__(self, value):
         self.value = value
 
@@ -126,3 +123,50 @@ class WhatWebError(Exception):
     def __repr__(self):
         return 'WhatWebError exception {0}'.format(self.value)
             
+class WhatWebAsync(WhatWeb):
+    def __init__(self):
+        super(WhatWebAsync, self).__init__(_whatweb_search_path)
+        
+    async def scan(self, targets, arguments = None):
+        args = self._get_scan_args(targets, arguments)
+        return (await self._scan_proc(args))
+    
+    def _get_scan_args(self, targets, arguments):
+        assert isinstance(targets, (str, list)), 'Wrong type for [hosts], should be a string or Iterable [was {0}]'.format(type(targets))
+        
+        if not isinstance(targets, str):
+            targets = ' '.join(targets)
+        if arguments:
+            assert all(_ not in arguments for _ in ('--log-json',)), 'can set log option'
+            scan_args = arguments
+        else:
+            scan_args = ''
+        return '--log-json=- -q ' + targets + scan_args
+        
+    async def _scan_proc(self, args):
+        proc = None
+        try:
+            if not self._whatweb_path:
+                for path in _whatweb_search_path:
+                    if os.path.isfile(path):
+                        self._whatweb_path = path 
+                        break 
+            
+            cmd = "{cmd} {args}".format(cmd=self._whatweb_path, args=args)
+            process = await asyncio.create_subprocess_shell(cmd,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE)
+            whatweb_output, whatweb_err = await  process.communicate()
+            
+        except Exception as e:
+            print("ERROR ", e)
+            return [{}]
+        else:
+            if whatweb_output:
+                try:
+                    applications = whatweb_output.decode('utf8').replace("'", '"')
+                    return json.loads(applications)
+                except json.JSONDecodeError as e:
+                    print("JSON DECODE ERROR", e)
+                    return [{}]
+                except Exception as e:
+                    print("ERROR ", e)
+                    return [{}]
