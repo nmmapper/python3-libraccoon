@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import concurrent.futures
 import ipaddress
 import multiprocessing
@@ -13,6 +11,8 @@ import dns.reversename
 import dns.zone
 import json
 from dns.resolver import Resolver
+import aiodns
+from aiodns.error import DNSError
 
 class LibFierce(object):
     def __init__(self, domain, resolver=None):
@@ -30,7 +30,6 @@ class LibFierce(object):
             result = set(l).difference(visited)
             visited.update(l)
             return result
-
         return inner
 
     def concatenate_subdomains(self, domain, subdomains):
@@ -69,10 +68,7 @@ class LibFierce(object):
         except (dns.resolver.NXDOMAIN, dns.resolver.NoNameservers, dns.exception.Timeout, ValueError):
             return None
 
-    def reverse_query(self, ip, tcp=False):
-        print("IP ", ip)
-        print("TCP ", tcp)
-        
+    def reverse_query(self, ip, tcp=False):        
         return self.query(dns.reversename.from_address(ip), record_type='PTR', tcp=tcp)
 
     def recursive_query(self, domain, record_type='NS', tcp=False):
@@ -141,9 +137,6 @@ class LibFierce(object):
         str_ips = [str(ip) for ip in ips]
         max_workers = multiprocessing.cpu_count() * 5
         
-        print("self.reverse_query ",self.reverse_query)
-        print("self.str_ips ",str_ips)
-        
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             reversed_ips = {
                 ip: query_result
@@ -156,7 +149,6 @@ class LibFierce(object):
                 )
             }
         
-        print("reversed_ips",reversed_ips)
         
         reversed_ips = {
             k: v[0].to_text()
@@ -166,9 +158,7 @@ class LibFierce(object):
         return reversed_ips
 
     def get_stripped_file_lines(self, filename):
-        """
-        Return lines of a file with whitespace removed
-        """
+        """Return lines of a file with whitespace removed"""
         try:
             lines = open(filename).readlines()
         except FileNotFoundError:
@@ -192,12 +182,8 @@ class LibFierce(object):
         """Search"""
         domain = self.get_domain_text()
         url = self.concatenate_subdomains(domain, [subdomain])
-        print("URL ", url)
-        print("\n")
         record = self.query(url, record_type='A', tcp=False)
-        print("Record", record)
-        print("\n")
-        
+
         if record is None or record.rrset is None:
             return []
             
@@ -212,16 +198,56 @@ class LibFierce(object):
         unvisited = self.unvisited_closure()
         unvisited_ips = unvisited(ips)
         
-        print("UNVISITED ", unvisited)
-        print("\n")
-        print("UNVISITED IP", unvisited_ips)
-        
-        print("\n")
         nearby = self.find_nearby(unvisited_ips, None)
-        print("Nearby", nearby)
-        print("\n")
         return nearby
                 
     def get_domain_text(self):
         return dns.name.from_text(self.domain)
         
+class LibFierceAsync(LibFierce):
+    def __init__(self, domain):
+        super(LibFierceAsync, self).__init__(domain)
+        self.domain = domain
+        self.resolver = aiodns.DNSResolver()
+        self.data = {}
+         
+    async def query(self, domain, record_type='A', tcp=False):
+        try:
+            resp = await self.resolver.query(domain.to_text(), record_type)
+            return resp
+        except (DNSError, ValueError):
+            return None
+    
+    async def find_nearby(self, ips, filter_func=None):
+        str_ips = [str(ip) for ip in ips]
+        
+        for ip in str_ips:
+            reversed_ip = await self.reverse_query(ip)
+            if(reversed_ip):
+                self.data[ip]=reversed_ip.name
+        return self.data
+    
+    async def reverse_query(self, ip, tcp=False):        
+        return await self.query(dns.reversename.from_address(ip), record_type='PTR', tcp=tcp)
+        
+    async def search(self, subdomain, traverse=None):
+        """Search"""
+        domain = self.get_domain_text()
+        url = self.concatenate_subdomains(domain, [subdomain])
+        record = await self.query(url, record_type='A', tcp=False)
+        
+        if record is None:
+            return []
+            
+        ips = [rr.host for rr in record]
+        ip = ipaddress.IPv4Address(ips[0])
+        
+        if(traverse):
+            ips = self.traverse_expander(ip, traverse)
+        else:
+            ips = self.traverse_expander(ip)
+        
+        unvisited = self.unvisited_closure()
+        unvisited_ips = unvisited(ips)
+        nearby = await self.find_nearby(unvisited_ips, None)
+        return nearby
