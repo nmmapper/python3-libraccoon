@@ -1,11 +1,10 @@
-#!/usr/bin/python3
-
 import httpx
 from libraccoon.utils.utils import get_user_agent
 from libraccoon.utils.utils import get_asn
 from libraccoon.utils.utils import get_ips
 
 class KnockPY(object):
+    HACKER_TARGET = "https://api.hackertarget.com/hostsearch/?q={domain}"
     def __init__(self, domain, wordlist=None, 
                     virustotalapi=None, 
                     discoveryapi=None, 
@@ -22,11 +21,12 @@ class KnockPY(object):
         
         if(not self.ua):
             self.ua = get_user_agent()
-    
+        
+        self.headers = {"User-Agent":self.ua}
+        
     async def bufferover_run(self):
-        try:
-            print("Searching using bufferoverrun")
-            
+        """@return List"""
+        try:            
             url = "https://dns.bufferover.run/dns?q={domain}".format(domain=self.domain)
             resp = {} 
             subdomains = []
@@ -48,6 +48,7 @@ class KnockPY(object):
             return []
             
     async def virustotal(self):
+        """@return List"""
         try:
             if not self.virustotalapi: 
                 return []
@@ -65,8 +66,34 @@ class KnockPY(object):
             
         except Exception as e:
             return []
+    
+    async def hackertarget(self):
+        """@return List"""
+        try:            
+            subdomains = []
+            async with httpx.AsyncClient() as client:
+                url = self.HACKER_TARGET.format(domain=self.domain)
+                print(url)
+
+                response = await client.get(url, headers=self.headers)
+                if(response.status_code == 200):
+                    response = response.text
+                    hostnames = [result.split(",")[0] for result in response.split("\n")]
+
+                    for hostname in hostnames:
+                        if hostname:
+                            subdomains.append(hostname)
+
+                subdomains = list(set(subdomains))
+            print("SUBDOMAINS ", subdomains)
+            return subdomains
+
+        except Exception as e:
+            print("Something went wrong! hackertarget")
+            return []
             
     async def projectdiscovery(self):
+        """@return List"""
         try:
             if not self.discoveryapi:
                 return [] 
@@ -94,6 +121,7 @@ class KnockPY(object):
             return []
             
     async def securitytrails(self):
+        """@return List"""
         try:
             if not self.securitytrail:
                 return [] 
@@ -135,6 +163,9 @@ class KnockPY(object):
         
         print("project bufferover_run")
         subdomains += await self.bufferover_run()
+        
+        print("project hackertarget")
+        subdomains += await self.hackertarget()
         
         subdomains_generator = (sub for sub in list(set(subdomains)))
                 
