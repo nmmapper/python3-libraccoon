@@ -45,6 +45,7 @@ class KnockPY(object):
             return list(set(subdomains))
             
         except Exception as e:
+            print("[Knockpy bufferover_run ERROR]", e, flush=True)
             return []
             
     async def virustotal(self):
@@ -61,10 +62,12 @@ class KnockPY(object):
                 req = await client.get(url, params=params, timeout=self.timeout)
                 resp = req.json()
                 
-            subdomains = resp.get("subdomains", [])        
+            subdomains = resp.get("subdomains", [])
+            print(subdomains)
             return subdomains
             
         except Exception as e:
+            print("[Knockpy virustotal ERROR]", e, flush=True)
             return []
     
     async def hackertarget(self):
@@ -73,7 +76,6 @@ class KnockPY(object):
             subdomains = []
             async with httpx.AsyncClient() as client:
                 url = self.HACKER_TARGET.format(domain=self.domain)
-                print(url)
 
                 response = await client.get(url, headers=self.headers)
                 if(response.status_code == 200):
@@ -81,15 +83,14 @@ class KnockPY(object):
                     hostnames = [result.split(",")[0] for result in response.split("\n")]
 
                     for hostname in hostnames:
-                        if hostname:
+                        if (hostname) and (self.domain in hostname):
                             subdomains.append(hostname)
 
                 subdomains = list(set(subdomains))
-            print("SUBDOMAINS ", subdomains)
             return subdomains
 
         except Exception as e:
-            print("Something went wrong! hackertarget")
+            print("[Knockpy hackertarget ERROR]", e, flush=True)
             return []
             
     async def projectdiscovery(self):
@@ -115,9 +116,10 @@ class KnockPY(object):
                     
                     for subs in subdomain_data:
                         subdomains.append(subs+"."+subdomain_domain)
-                    return subdomains 
-            return []
+                    return subdomains
+            return subdomains
         except Exception as e:
+            print("[Knockpy projectdiscovery ERROR]", e, flush=True)
             return []
             
     async def securitytrails(self):
@@ -143,10 +145,10 @@ class KnockPY(object):
                     
                     for subs in subdomain_data:
                         subdomains.append(subs+"."+self.domain)
-                    return subdomains
                    
-            return []
+            return subdomains
         except Exception as e:
+            print("[Knockpy securitytrails ERROR]", e, flush=True)
             return []
             
     async def search(self, resolve=False, return_dict=True):
@@ -167,6 +169,10 @@ class KnockPY(object):
         print("project hackertarget")
         subdomains += await self.hackertarget()
         
+        if not resolve and not return_dict:
+            print("Returning nothing")
+            return subdomains 
+            
         subdomains_generator = (sub for sub in list(set(subdomains)))
                 
         if(resolve):
