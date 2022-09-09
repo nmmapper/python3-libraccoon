@@ -63,7 +63,6 @@ class KnockPY(object):
                 resp = req.json()
                 
             subdomains = resp.get("subdomains", [])
-            print(subdomains)
             return subdomains
             
         except Exception as e:
