@@ -92,11 +92,11 @@ class WhatWeb(object):
         if whatweb_output:
             try:
                 whatweb_output = whatweb_output.decode('utf8')
-                return json.loads(whatweb_output, encoding = 'utf-8')
+                return json.loads(whatweb_output)
             except json.JSONDecodeError as e:
                 print("JSON DECODE ERROR", e)
                 return [{}]
-            except:
+            except Exception as e:
                 return [{}]
        
     def _get_scan_args(self, targets, arguments):

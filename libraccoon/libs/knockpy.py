@@ -9,6 +9,7 @@ class KnockPY(object):
                     virustotalapi=None, 
                     discoveryapi=None, 
                     securitytrail=None,
+                    binary_edge_api=None,
                     ua=None):
                         
         self.domain = domain 
@@ -16,6 +17,7 @@ class KnockPY(object):
         self.virustotalapi = virustotalapi
         self.discoveryapi = discoveryapi
         self.securitytrail = securitytrail
+        self.binary_edge_api = binary_edge_api
         self.ua=ua
         self.timeout = 50
         
@@ -27,25 +29,29 @@ class KnockPY(object):
     async def bufferover_run(self):
         """@return List"""
         try:            
-            url = "https://dns.bufferover.run/dns?q={domain}".format(domain=self.domain)
-            resp = {} 
+            return []
+        except Exception as e:
+            print("[Knockpy bufferover_run ERROR]", e, flush=True)
+            return []
+    
+    async def virustotal_subdomain(self):
+        try:
+            if not self.virustotalapi:
+                return []
+                
+            url = "https://www.virustotal.com/api/v3/domains/{domain}/subdomains".format(domain=self.domain)
+            headers= {"x-apikey":self.virustotalapi}
+            
             subdomains = []
             
             async with httpx.AsyncClient() as client:
-                req = await client.get(url, timeout=self.timeout)
-                resp = req.json()
-                
-            FDNS_A = req.json().get("FDNS_A")
-            for fdns in FDNS_A:
-                if("," in fdns):
-                    sub = fdns.split(",")[-1]
-                    subdomains.append(sub)
-                else:
-                    subdomains.append(fdns)
-            return list(set(subdomains))
-            
+                req = await client.get(url, headers=headers, timeout=self.timeout)
+                data = req.json().get("data")
+                for d in data:
+                    subdomains.app(d.get("id"))
+            return subdomains 
         except Exception as e:
-            print("[Knockpy bufferover_run ERROR]", e, flush=True)
+            print("[Knockpy virustotal_subdomain ERROR, Fallback failed]", e, flush=True)
             return []
             
     async def virustotal(self):
@@ -66,8 +72,8 @@ class KnockPY(object):
             return subdomains
             
         except Exception as e:
-            print("[Knockpy virustotal ERROR]", e, flush=True)
-            return []
+            print("[Knockpy virustotal ERROR, Using fallback]", e, flush=True)
+            return await self.virustotal_subdomain()
     
     async def hackertarget(self):
         """@return List"""
@@ -150,9 +156,40 @@ class KnockPY(object):
             print("[Knockpy securitytrails ERROR]", e, flush=True)
             return []
             
+    async def binary_edge(self):
+        """@return List"""
+        try:
+            if not self.binary_edge_api:
+                return [] 
+                
+            headers = {"X-KEY":self.binary_edge_api, "User-Agent":self.ua}
+            url = "https://api.binaryedge.io/v2/query/domains/subdomain/{domain}".format(domain=self.domain)
+            subdomains = []
+            
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(url, headers=headers, timeout=self.timeout)
+                
+                if(resp.status_code == 200):
+                    data = resp.json()
+                    page = data.get("page")
+                    subdomains += data.get("events")
+            
+            print("BINARY EDGE ", subdomains)
+            return subdomains 
+            
+        except Exception as e:
+            print("[Knockpy binary_edge ERROR]", e, flush=True)
+            return []
+            
     async def search(self, resolve=False, return_dict=True):
         subdomains = []
 
+        print("Searching binary_edge")
+        binary_subdomains = await self.binary_edge()
+        
+        if binary_subdomains:
+            subdomains += binary_subdomains
+            
         print("Searching virustotal")
         subdomains += await self.virustotal()
         
