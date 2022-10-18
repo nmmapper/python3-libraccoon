@@ -8,3 +8,4 @@ ipaddress
 xmltodict
 geoip2
 httpx
+tld

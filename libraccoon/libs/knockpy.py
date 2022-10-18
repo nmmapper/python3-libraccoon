@@ -2,6 +2,7 @@ import httpx
 from libraccoon.utils.utils import get_user_agent
 from libraccoon.utils.utils import get_asn
 from libraccoon.utils.utils import get_ips
+from tld import get_tld
 
 class KnockPY(object):
     HACKER_TARGET = "https://api.hackertarget.com/hostsearch/?q={domain}"
@@ -26,12 +27,29 @@ class KnockPY(object):
         
         self.headers = {"User-Agent":self.ua}
         
-    async def bufferover_run(self):
+    async def waybackurl(self):
         """@return List"""
-        try:            
-            return []
+        try:
+            url='https://web.archive.org/cdx/search/cdx?url={domain}&matchType=domain&fl=original&collapse=urlkey&limit=1000&output=json'.format(domain=self.domain)
+            subdomains = []
+            
+            async with httpx.AsyncClient() as client:
+                req = await client.get(url, timeout=self.timeout)
+                data = req.json()
+                
+                for d in data:
+                    url = d[0]
+                    
+                    if("http" in url):
+                        tld = get_tld(url, as_object=True, fix_protocol=True)
+                        
+                        if (tld.subdomain):
+                            sub = "{subdomain}.{tld}".format(subdomain=tld.subdomain, tld=tld.fld)
+                            subdomains.append(sub)
+            
+            return list(set(subdomains))
         except Exception as e:
-            print("[Knockpy bufferover_run ERROR]", e, flush=True)
+            print("[Knockpy waybackurl ERROR]", e, flush=True)
             return []
     
     async def virustotal_subdomain(self):
@@ -183,7 +201,10 @@ class KnockPY(object):
             
     async def search(self, resolve=False, return_dict=True):
         subdomains = []
-
+        
+        print("Searching waybackurl")
+        subdomains = await self.waybackurl()
+        
         print("Searching binary_edge")
         binary_subdomains = await self.binary_edge()
         
@@ -198,9 +219,6 @@ class KnockPY(object):
         
         print("project securitytrails")
         subdomains += await self.securitytrails()
-        
-        print("project bufferover_run")
-        subdomains += await self.bufferover_run()
         
         print("project hackertarget")
         subdomains += await self.hackertarget()
