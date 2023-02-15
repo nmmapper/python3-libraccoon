@@ -1,7 +1,7 @@
 aiodns
 python-whois
 httpx
-beautifulsoup4
+bs4
 dnspython
 requests
 ipaddress

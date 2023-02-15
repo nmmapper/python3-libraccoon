@@ -3,6 +3,7 @@ from libraccoon.utils.utils import get_user_agent
 from libraccoon.utils.utils import get_asn
 from libraccoon.utils.utils import get_ips
 from tld import get_tld
+from bs4 import BeautifulSoup
 
 class KnockPY(object):
     HACKER_TARGET = "https://api.hackertarget.com/hostsearch/?q={domain}"
@@ -199,8 +200,63 @@ class KnockPY(object):
             print("[Knockpy binary_edge ERROR]", e, flush=True)
             return []
             
+    async def riddler(self):
+        """@return List"""
+        try:
+            url = "https://riddler.io/search?q=pld:{domain}".format(domain=self.domain)
+            subdomains = []
+            
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(url,timeout=self.timeout)
+                
+                if(resp.status_code == 200):
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    result = soup.find("table", {"class":"table"})
+                    tbody = result.find("tbody")
+                    links = tbody.find_all("a", {"rel":True, "target":True})
+                    for l in links:
+                        attrs = l.attrs
+                        if(attrs):
+                            href = attrs.get("href").replace("//", "", len(attrs))
+                            subdomains.append(href)
+
+            return subdomains 
+            
+        except Exception as e:
+            print("[Knockpy riddler ERROR]", e, flush=True)
+            return []
+            
+    async def urlscan(self):
+        """@return List"""
+        try:
+            url = "https://urlscan.io/api/v1/search/?q=domain:{domain}".format(domain=self.domain)
+            subdomains = []
+            
+            async with httpx.AsyncClient() as client:
+                req = await client.get(url,timeout=self.timeout)
+                
+                if(req.status_code == 200):
+                    data = req.json()
+                    results = data.get('results')
+                    for r in results:
+                        task = r.get("task")
+                        domain = task.get("domain")
+                        if(self.domain in domain):
+                            subdomains.append(domain)
+            return list(set(subdomains))
+            
+        except Exception as e:
+            print("[Knockpy urlscan ERROR]", e, flush=True)
+            return []
+            
     async def search(self, resolve=False, return_dict=True):
         subdomains = []
+        
+        print("Searching urlscan")
+        subdomains = await self.urlscan()
+        
+        print("Searching riddler")
+        subdomains = await self.riddler()
         
         print("Searching waybackurl")
         subdomains = await self.waybackurl()
