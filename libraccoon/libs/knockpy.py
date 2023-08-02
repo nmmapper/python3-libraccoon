@@ -1,4 +1,4 @@
-import httpx
+import httpx, requests
 from libraccoon.utils.utils import get_user_agent
 from libraccoon.utils.utils import get_asn
 from libraccoon.utils.utils import get_ips
@@ -324,3 +324,298 @@ class KnockPY(object):
         # If neither resolve or return_dict, return the default
         return subdomains
         
+
+class KnockPYSync(KnockPY):
+    def __init__(self, domain, wordlist=None, 
+                    virustotalapi=None, 
+                    discoveryapi=None, 
+                    securitytrail=None,
+                    binary_edge_api=None,
+                    ua=None):
+                        
+        self.domain = domain 
+        self.wordlist = wordlist
+        self.virustotalapi = virustotalapi
+        self.discoveryapi = discoveryapi
+        self.securitytrail = securitytrail
+        self.binary_edge_api = binary_edge_api
+        self.ua=ua
+        self.timeout = 50
+        
+        if(not self.ua):
+            self.ua = get_user_agent()
+        
+        self.headers = {"User-Agent":self.ua}
+        
+    def waybackurl(self):
+        """@return List"""
+        try:
+            url='https://web.archive.org/cdx/search/cdx?url={domain}&matchType=domain&fl=original&collapse=urlkey&limit=1000&output=json'.format(domain=self.domain)
+            subdomains = []
+            
+            with requests.Session() as client:
+                req = client.get(url, timeout=self.timeout)
+                data = req.json()
+                
+                for d in data:
+                    url = d[0]
+                    
+                    if("http" in url):
+                        tld = get_tld(url, as_object=True, fix_protocol=True)
+                        
+                        if (tld.subdomain):
+                            sub = "{subdomain}.{tld}".format(subdomain=tld.subdomain, tld=tld.fld)
+                            subdomains.append(sub)
+            
+            return list(set(subdomains))
+        except Exception as e:
+            print("[Knockpy waybackurl ERROR]", e, flush=True)
+            return []
+    
+    def virustotal_subdomain(self):
+        try:
+            if not self.virustotalapi:
+                return []
+                
+            url = "https://www.virustotal.com/api/v3/domains/{domain}/subdomains".format(domain=self.domain)
+            headers= {"x-apikey":self.virustotalapi}
+            
+            subdomains = []
+            
+            with requests.Session() as client:
+                req = client.get(url, headers=headers, timeout=self.timeout)
+                data = req.json().get("data")
+                for d in data:
+                    subdomains.app(d.get("id"))
+            return subdomains 
+        except Exception as e:
+            print("[Knockpy virustotal_subdomain ERROR, Fallback failed]", e, flush=True)
+            return []
+            
+    def virustotal(self):
+        """@return List"""
+        try:
+            if not self.virustotalapi: 
+                return []
+                
+            url = "https://www.virustotal.com/vtapi/v2/domain/report"
+            params = {"apikey": self.virustotalapi,"domain": self.domain}
+            resp = {} 
+            
+            with requests.Session() as client:
+                req = client.get(url, params=params, timeout=self.timeout)
+                resp = req.json()
+                
+            subdomains = resp.get("subdomains", [])
+            return subdomains
+            
+        except Exception as e:
+            print("[Knockpy virustotal ERROR, Using fallback]", e, flush=True)
+            return self.virustotal_subdomain()
+    
+    def hackertarget(self):
+        """@return List"""
+        try:            
+            subdomains = []
+            with requests.Session() as client:
+                url = self.HACKER_TARGET.format(domain=self.domain)
+
+                response = client.get(url, headers=self.headers)
+                if(response.status_code == 200):
+                    response = response.text
+                    hostnames = [result.split(",")[0] for result in response.split("\n")]
+
+                    for hostname in hostnames:
+                        if (hostname) and (self.domain in hostname):
+                            subdomains.append(hostname)
+
+                subdomains = list(set(subdomains))
+            return subdomains
+
+        except Exception as e:
+            print("[Knockpy hackertarget ERROR]", e, flush=True)
+            return []
+            
+    def projectdiscovery(self):
+        """@return List"""
+        try:
+            if not self.discoveryapi:
+                return [] 
+                
+            headers = {"Authorization":self.discoveryapi}
+            url="https://dns.projectdiscovery.io/dns/{domain}/subdomains".format(domain=self.domain)
+            resp = None
+            
+            with requests.Session() as client:
+                resp = client.get(url, headers=headers, timeout=self.timeout)
+                
+            subdomains = []
+            
+            if(resp is not None):
+                if(resp.status_code == 200):
+                    data = resp.json()
+                    subdomain_data = data.get("subdomains")
+                    subdomain_domain = data.get("domain")
+                    
+                    for subs in subdomain_data:
+                        subdomains.append(subs+"."+subdomain_domain)
+                    return subdomains
+            return subdomains
+        except Exception as e:
+            print("[Knockpy projectdiscovery ERROR]", e, flush=True)
+            return []
+            
+    def securitytrails(self):
+        """@return List"""
+        try:
+            if not self.securitytrail:
+                return [] 
+                
+            querystring = {"children_only":"false","include_inactive":"true"}
+            headers = {"Accept": "application/json", "apikey":self.securitytrail}
+            url = "https://api.securitytrails.com/v1/domain/{domain}/subdomains".format(domain=self.domain)
+            resp = None
+            
+            with requests.Session() as client:
+                resp = client.get(url, headers=headers, params=querystring, timeout=self.timeout)
+                        
+            subdomains = []
+            
+            if(resp is not None):
+                if(resp.status_code == 200):
+                    data = resp.json()
+                    subdomain_data = data.get("subdomains")
+                    
+                    for subs in subdomain_data:
+                        subdomains.append(subs+"."+self.domain)
+                   
+            return subdomains
+        except Exception as e:
+            print("[Knockpy securitytrails ERROR]", e, flush=True)
+            return []
+            
+    def binary_edge(self):
+        """@return List"""
+        try:
+            if not self.binary_edge_api:
+                return [] 
+                
+            headers = {"X-KEY":self.binary_edge_api, "User-Agent":self.ua}
+            url = "https://api.binaryedge.io/v2/query/domains/subdomain/{domain}".format(domain=self.domain)
+            subdomains = []
+            
+            with requests.Session() as client:
+                resp = client.get(url, headers=headers, timeout=self.timeout)
+                
+                if(resp.status_code == 200):
+                    data = resp.json()
+                    page = data.get("page")
+                    subdomains += data.get("events")
+            
+            print("BINARY EDGE ", subdomains)
+            return subdomains 
+            
+        except Exception as e:
+            print("[Knockpy binary_edge ERROR]", e, flush=True)
+            return []
+            
+    def riddler(self):
+        """@return List"""
+        try:
+            url = "https://riddler.io/search?q=pld:{domain}".format(domain=self.domain)
+            subdomains = []
+            
+            with requests.Session() as client:
+                resp = client.get(url,timeout=self.timeout)
+                
+                if(resp.status_code == 200):
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    result = soup.find("table", {"class":"table"})
+                    tbody = result.find("tbody")
+                    links = tbody.find_all("a", {"rel":True, "target":True})
+                    for l in links:
+                        attrs = l.attrs
+                        if(attrs):
+                            href = attrs.get("href").replace("//", "", len(attrs))
+                            subdomains.append(href)
+
+            return subdomains 
+            
+        except Exception as e:
+            print("[Knockpy riddler ERROR]", e, flush=True)
+            return []
+            
+    def urlscan(self):
+        """@return List"""
+        try:
+            url = "https://urlscan.io/api/v1/search/?q=domain:{domain}".format(domain=self.domain)
+            subdomains = []
+            
+            with requests.Session() as client:
+                req = client.get(url,timeout=self.timeout)
+                
+                if(req.status_code == 200):
+                    data = req.json()
+                    results = data.get('results')
+                    for r in results:
+                        task = r.get("task")
+                        domain = task.get("domain")
+                        if(self.domain in domain):
+                            subdomains.append(domain)
+            return list(set(subdomains))
+            
+        except Exception as e:
+            print("[Knockpy urlscan ERROR]", e, flush=True)
+            return []
+            
+    def search(self, resolve=False, return_dict=True):
+        subdomains = []
+        
+        print("Searching urlscan")
+        subdomains = self.urlscan()
+        
+        print("Searching riddler")
+        subdomains = self.riddler()
+        
+        print("Searching waybackurl")
+        subdomains = self.waybackurl()
+        
+        print("Searching binary_edge")
+        binary_subdomains = self.binary_edge()
+        
+        if binary_subdomains:
+            subdomains += binary_subdomains
+            
+        print("Searching virustotal")
+        subdomains += self.virustotal()
+        
+        print("project discovery")
+        subdomains +=  self.projectdiscovery()
+        
+        print("project securitytrails")
+        subdomains += self.securitytrails()
+        
+        print("project hackertarget")
+        subdomains += self.hackertarget()
+        
+        if not resolve and not return_dict:
+            print("Returning nothing")
+            return subdomains 
+            
+        subdomains_generator = (sub for sub in list(set(subdomains)))
+                
+        # If the return should be dictionary
+        if(return_dict):
+            subdomain = []
+            
+            for sub in subdomains_generator:
+                subdomain.append({
+                    "host":self.domain,
+                    "subdomain":sub,
+                    "ip":"",
+                    "asn":""
+                })
+            return subdomain
+        
+        # If neither resolve or return_dict, return the default
+        return subdomains
