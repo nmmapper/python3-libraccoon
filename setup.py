@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="python3-libraccoon", 
-    version="2.2.2",
+    version="3.0.2",
     author="nmmapper",
     author_email="inquiry@nmmapper.com",
     description="libraccon a library for high performance offensive security tool for reconnaissance based on raccoon scanner. This include performing DNS reconnaissance ",
