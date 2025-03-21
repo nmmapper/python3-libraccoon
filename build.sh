@@ -3,7 +3,7 @@
 function buildaction(){
     buildcmd="python3 setup.py sdist bdist_wheel"
     rmbuild="rm -rf build/ dist/ python3_libraccoon.egg-info/"
-    uploadcmd="twine upload dist/*"
+    uploadcmd="twine upload --verbose dist/*"
     
     if [ -z $1 ]
     then

@@ -1,7 +1,3 @@
-
-
-
-
 # libraccoon
 
 libraccon a library for high performance offensive security tool for reconnaissance based on raccoon scanner. This library is based on Raccoon A high performance offensive security tool for reconnaissance and vulnerability scanning. The difference is we are providing a library to be used as a module.
@@ -139,3 +135,36 @@ ret = lib.search("www", 10)
 }
 ```
 
+### Whatweb tools can also be invoked from this tool.
+Remember the tool is designed to be used as a library to be incorporated into other tools.
+Just want caveat ensure that whatweb tool is installed.
+
+```py
+from  libraccoon.libs.whatwebapi  import  WhatWebAsync
+what  =  WhatWebAsync()
+host = "https://www.nmmapper.com"
+
+result  =  await  what.scan(host)
+
+[{'target': 'https://www.nmmapper.com',
+  'http_status': 200,
+  'request_config': {'headers': {'User-Agent': 'WhatWeb/0.5.5'}},
+  'plugins': {'Content-Language': {'string': ['en']},
+   'Cookies': {'string': ['csrftoken', 'sessionid']},
+   'Country': {'string': ['UNITED STATES'], 'module': ['US']},
+   'Django': {},
+   'HTML5': {},
+   'HTTPServer': {'string': ['cloudflare']},
+   'HttpOnly': {'string': ['sessionid']},
+   'IP': {'string': ['104.21.54.232']},
+   'Meta-Author': {'string': ['Nmmapper.com']},
+   'Open-Graph-Protocol': {'version': ['article']},
+   'Script': {'string': ['Javascript',
+     'application/ld+json',
+     'text/Javascript',
+     'text/javascript']},
+   'Strict-Transport-Security': {'string': ['max-age=15552000; includeSubDomains; preload']},
+   'Title': {'string': ['Nmmapper Subdomain finder,Nmap online,theharvester']},
+   'UncommonHeaders': {'string': ['x-content-type-options,referrer-policy,cross-origin-opener-policy,access-control-allow-origin,cf-cache-status,report-to,nel,cf-ray,alt-svc,server-timing']},
+   'X-Frame-Options': {'string': ['DENY']}}}]
+```

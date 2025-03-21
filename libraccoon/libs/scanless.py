@@ -116,7 +116,6 @@ class Scanless(object):
                     output = re.sub("<[^<]+?>", "", r.content.decode())
                     raw_output = output.replace("\\n", "\n").replace("\\/", "/")[36:-46].strip()
                     data = self.parse(raw_output)
-                    print(data)
                     return data
                 else:
                     print("Scanless method[scan_ipfingerprints] status code ", r.status_code)
@@ -156,7 +155,6 @@ class Scanless(object):
                                         
                     raw_output = self.generate_output(raw_data)
                     parsed_output = self.parse(raw_output)
-                    print(parsed_output)
                     return parsed_output
                 else:
                     print("Scanless method[spiderip] status code ", r.status_code)
@@ -210,8 +208,6 @@ class Scanless(object):
                     else:
                         print("Scanless method[spiderip] status code ", r.status_code)
                         return []
-                
-                print(data)
                 return data
                 
             except Exception as e:
@@ -269,7 +265,7 @@ class Scanless(object):
                     msg = "STATUS Scanless method[viewdns] {status}".format(status=ret.status_code)
                     print(msg)
                 
-                print(data)
+                return data
                 
             except Exception as e:
                 msg = "ERROR Scanless method[spiderip] {msg}".format(msg=str(e))
@@ -302,7 +298,6 @@ class Scanless(object):
                     
                     raw_output = self.generate_output(raw_data)
                     data = self.parse(raw_output)
-                    print(data)
                     return data
                     
                 else:
