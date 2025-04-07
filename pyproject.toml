@@ -16,7 +16,7 @@ classifiers = [
 dynamic = ["dependencies", "version"]
 
 [tool.setuptools.dynamic]
-version = { attr = "libraccoon.utils.VERSION" }
+version = { attr = "libraccoon.utils.utils.VERSION" }
 dependencies = { file = "requirements.txt" }
 
 [tool.setuptools.packages.find]
