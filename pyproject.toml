@@ -1,0 +1,88 @@
+[project]
+name = "python3-libraccoon"
+description = "libraccon a library for high performance offensive security tool for reconnaissance based on raccoon scanner. This include performing DNS reconnaissance"
+readme = "README.md"
+authors = [{ name = "nmmapper", email = "inquiry@nmmapper.com" }]
+requires-python = ">=3.11"
+urls.Homepage = "https://github.com/nmmapper/python3-libraccoon"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+    "Operating System :: OS Independent",
+]
+dynamic = ["dependencies", "version"]
+
+[tool.setuptools.dynamic]
+version = { attr = "libraccoon.utils.VERSION" }
+dependencies = { file = "requirements.txt" }
+
+[tool.setuptools.packages.find]
+include = ["libraccoon*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.txt"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    "tests",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".mypy_cache",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".github",
+    ".venv",
+    ".vscode",
+    ".idea",
+    "__pypackages__",
+    "build",
+    "dist",
+    "site-packages",
+    "venv",
+]
+
+line-length = 130
+target-version = "py311"
+show-fixes = true
+
+[tool.ruff.lint]
+select = ["E4",
+    "E7",
+    "E9",
+    "F",
+    "I",
+    "UP",
+    "TCH",
+    "RUF",
+    "PT",
+    ]
+ignore = ["E721", "F403", "F405", "UP030"]
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.format]
+# Like Black, use double quotes for strings.
+quote-style = "single"
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"

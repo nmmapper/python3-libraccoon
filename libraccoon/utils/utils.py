@@ -5,8 +5,10 @@ GEOLITE2_CITYDB="/usr/share/GeoIP/GeoLite2-City.mmdb"
 GEOLITE2_ASN="/usr/share/GeoIP/GeoLite2-ASN.mmdb"
 GEOLITE2_COUNTRY="/usr/share/GeoIP/GeoLite2-Country.mmdb"
 
+VERSION = "3.3.5"
+
 def get_user_agent():
-    return "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:89.0) Gecko/20100101 Firefox/89.0"
+    return "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0"
 
 def get_asn(ip, db=None):
     """Return api Autonomous system number"""

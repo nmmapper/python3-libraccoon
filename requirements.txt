@@ -9,3 +9,4 @@ xmltodict
 geoip2
 httpx
 tld
+simplejson
