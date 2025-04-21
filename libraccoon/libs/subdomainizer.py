@@ -5,9 +5,10 @@ import math
 from urllib.parse import urlparse
 from typing import Dict, List, Optional, Set
 from bs4 import BeautifulSoup  # For parsing HTML
+from urllib.parse import unquote
 
 class SubDomainizer(object):
-    def __init__(self, target_url: str, max_depth: int = 2, entropy_threshold: float = 4.0):
+    def __init__(self, target_url: str, max_depth: int = 2, entropy_threshold: float = 4.0, ua:str = None):
         self.target_url = target_url
         self.max_depth = max_depth
         self.entropy_threshold = entropy_threshold  # Threshold for detecting high-entropy strings
@@ -19,6 +20,13 @@ class SubDomainizer(object):
             "cloud_providers": set(),
         }
         self.timeout = 5
+        self.user_agent = ua
+        if not self.user_agent:
+            self.user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36" # Default user agent
+            
+        self.headers = {
+            "User-Agent":self.user_agent
+        }
         
     async def fetch(self, session: aiohttp.ClientSession, url: str) -> Optional[str]:
         """Fetch the content of a URL asynchronously."""
@@ -31,12 +39,27 @@ class SubDomainizer(object):
         return None
 
     def extract_subdomains(self, text: str) -> List[str]:
-        """Extract subdomains from the text."""
+        """Extract valid subdomains from URLs in the text, ignoring URL-encoded noise."""
+        
         domain = urlparse(self.target_url).netloc
-        base_domain = ".".join(domain.split(".")[-2:])  # Extract base domain (e.g., example.com)
-        subdomains = re.findall(rf"(https?://)?([a-zA-Z0-9.-]+\.{re.escape(base_domain)})", text)
-        return [sub[1] for sub in subdomains]
+        base_domain = ".".join(domain.split(".")[-2:])
+        subdomains = set()
 
+        # Find all URLs in the text
+        urls = re.findall(rf"https?://[a-zA-Z0-9.-]+(?:\.{re.escape(base_domain)})", text)
+        
+        for url in urls:
+            # Decode URL-encoded characters (e.g., %2F -> /)
+            decoded_url = unquote(url)
+            parsed = urlparse(decoded_url)
+            hostname = parsed.netloc if parsed.netloc else parsed.path.split("/")[0]
+            
+            # Validate if the hostname is a subdomain of the base domain
+            if hostname.endswith(f".{base_domain}") or hostname == base_domain:
+                subdomains.add(hostname)
+
+        return list(subdomains)
+        
     def extract_external_domains(self, text: str) -> List[str]:
         """Extract external domains from the text, including those in <script> tags."""
         external_domains = set()
