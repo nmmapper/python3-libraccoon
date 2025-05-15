@@ -1,4 +1,5 @@
 aiodns
+aiofiles
 python-whois
 httpx
 bs4
