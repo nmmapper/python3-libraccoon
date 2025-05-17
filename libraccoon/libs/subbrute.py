@@ -38,7 +38,7 @@ class AsyncSubBrute:
         attempt = 1
         while True:
             try:
-                logging.info(f"Resolving (Attempt {attempt}): {domain}")
+                #logging.info(f"Resolving (Attempt {attempt}): {domain}")
                 result = await asyncio.wait_for(self.resolver.query(domain, record_type), timeout=5.0)
                 resolved_ips = [r.host for r in result]
 
@@ -47,7 +47,7 @@ class AsyncSubBrute:
 
                 return {"domain": domain, "record_type": record_type, "result": resolved_ips, "status": "success"}
             except Exception as e:
-                logging.error(f"Error resolving {domain} (Attempt {attempt}): {e}")
+                #logging.error(f"Error resolving {domain} (Attempt {attempt}): {e}")
                 if not self.retry_enabled or attempt >= self.max_retries:
                     return {"domain": domain, "record_type": record_type, "error": str(e), "status": "failed"}
                 await asyncio.sleep(0.5 * attempt)
