@@ -33,7 +33,8 @@ class AsyncSubBrute:
         self.wildcard_ips = set()
         self.max_retries = max_retries
         self.retry_enabled = retry_enabled
-
+        self.host = None 
+        
     async def resolve(self, domain: str, record_type: str = 'A') -> Dict[str, str]:
         attempt = 1
         while True:
@@ -43,13 +44,13 @@ class AsyncSubBrute:
                 resolved_ips = [r.host for r in result]
 
                 if self.wildcard_ips and set(resolved_ips).issubset(self.wildcard_ips):
-                    return {"domain": domain, "record_type": record_type, "status": "wildcard_detected"}
+                    return {"host":self.host, "domain": domain, "record_type": record_type, "status": "wildcard_detected"}
 
-                return {"domain": domain, "record_type": record_type, "result": resolved_ips, "status": "success"}
+                return {"host":self.host,"domain": domain, "record_type": record_type, "result": resolved_ips, "status": "success"}
             except Exception as e:
                 #logging.error(f"Error resolving {domain} (Attempt {attempt}): {e}")
                 if not self.retry_enabled or attempt >= self.max_retries:
-                    return {"domain": domain, "record_type": record_type, "error": str(e), "status": "failed"}
+                    return {"host":self.host,"domain": domain, "record_type": record_type, "error": str(e), "status": "failed"}
                 await asyncio.sleep(0.5 * attempt)
                 attempt += 1
 
@@ -90,7 +91,8 @@ class AsyncSubBrute:
     async def scan_with_queue(self, domain: str, subdomains: List[str], concurrency: int = 500, batch_size: int = 1000) -> Dict[str, Dict[str, str]]:
         await self.detect_wildcard(domain)
         results = {}
-
+        self.host = domain 
+        
         for i in range(0, len(subdomains), batch_size):
             batch = subdomains[i:i+batch_size]
             queue = asyncio.Queue()
