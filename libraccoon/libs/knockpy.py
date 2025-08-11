@@ -21,13 +21,28 @@ class KnockPY(object):
         self.securitytrail = securitytrail
         self.binary_edge_api = binary_edge_api
         self.ua=ua
-        self.timeout = 50
+        self.timeout = 5
         
         if(not self.ua):
             self.ua = get_user_agent()
         
         self.headers = {"User-Agent":self.ua}
-        
+    
+    def _is_subdomain(self, host: str, domain: str, include_apex: bool) -> bool:
+        if host == domain:
+            return include_apex
+        return host.endswith("." + domain)
+    
+    def _clean_name(self, name: str) -> str:
+        n = name.strip().lower()
+        if n.startswith("*."):
+            n = n[2:]
+        if n.endswith("."):
+            n = n[:-1]
+        if n.startswith("."):
+            n = n[1:]
+        return n
+    
     async def waybackurl(self):
         """@return List"""
         try:
@@ -175,55 +190,49 @@ class KnockPY(object):
             print("[Knockpy securitytrails ERROR]", e, flush=True)
             return []
             
-    async def binary_edge(self):
+    async def crt(self):
         """@return List"""
         try:
-            if not self.binary_edge_api:
-                return [] 
-                
-            headers = {"X-KEY":self.binary_edge_api, "User-Agent":self.ua}
-            url = "https://api.binaryedge.io/v2/query/domains/subdomain/{domain}".format(domain=self.domain)
-            subdomains = []
+            url = "https://crt.sh/json?q={domain}".format(domain=self.domain)
+            subdomains = set()
             
             async with httpx.AsyncClient() as client:
-                resp = await client.get(url, headers=headers, timeout=self.timeout)
+                req = await client.get(url, timeout=10)
+                if(req.status_code == 200):
+                    data = req.json()
+                    
+                    for entry in data:
+                        name_value = entry.get('name_value', '')
+                        for sub in name_value.split('\n'):
+                            sub = self._clean_name(sub.strip().lower())
+                            if(not sub):
+                                continue 
+                                
+                            # Skip wildcard entries and empty strings
+                            if self._is_subdomain(sub, self.domain, False):
+                                # Remove any wildcard prefix if present at beginning
+                                subdomains.add(sub)
                 
-                if(resp.status_code == 200):
-                    data = resp.json()
-                    page = data.get("page")
-                    subdomains += data.get("events")
-            
-            print("BINARY EDGE ", subdomains)
-            return subdomains 
-            
+            return sorted(subdomains)
+        
         except Exception as e:
-            print("[Knockpy binary_edge ERROR]", e, flush=True)
+            print("[Knockpy crt ERROR]", e, flush=True)
             return []
             
-    async def riddler(self):
+    async def api_subdomain_center(self):
         """@return List"""
         try:
-            url = "https://riddler.io/search?q=pld:{domain}".format(domain=self.domain)
+            url = "https://api.subdomain.center/?domain={domain}".format(domain=self.domain)
             subdomains = []
             
             async with httpx.AsyncClient() as client:
                 resp = await client.get(url,timeout=self.timeout)
-                
                 if(resp.status_code == 200):
-                    soup = BeautifulSoup(resp.text, "html.parser")
-                    result = soup.find("table", {"class":"table"})
-                    tbody = result.find("tbody")
-                    links = tbody.find_all("a", {"rel":True, "target":True})
-                    for l in links:
-                        attrs = l.attrs
-                        if(attrs):
-                            href = attrs.get("href").replace("//", "", len(attrs))
-                            subdomains.append(href)
-
-            return subdomains 
+                    subdomains = resp.json()
+            return list(set(subdomains)) 
             
         except Exception as e:
-            print("[Knockpy riddler ERROR]", e, flush=True)
+            print("[Knockpy api_subdomain_center ERROR]", e, flush=True)
             return []
             
     async def urlscan(self):
@@ -255,17 +264,17 @@ class KnockPY(object):
         print("Searching urlscan")
         subdomains = await self.urlscan()
         
-        print("Searching riddler")
-        subdomains = await self.riddler()
+        print("Searching api_subdomain_center")
+        subdomains = await self.api_subdomain_center()
         
         print("Searching waybackurl")
         subdomains = await self.waybackurl()
         
-        print("Searching binary_edge")
-        binary_subdomains = await self.binary_edge()
+        print("Searching crt")
+        crt_subdomains = await self.crt()
         
-        if binary_subdomains:
-            subdomains += binary_subdomains
+        if crt_subdomains:
+            subdomains += crt_subdomains
             
         print("Searching virustotal")
         subdomains += await self.virustotal()
@@ -519,30 +528,20 @@ class KnockPYSync(KnockPY):
             print("[Knockpy binary_edge ERROR]", e, flush=True)
             return []
             
-    def riddler(self):
+    def api_subdomain_center(self):
         """@return List"""
         try:
-            url = "https://riddler.io/search?q=pld:{domain}".format(domain=self.domain)
+            url = "https://api.subdomain.center/?domain={domain}".format(domain=self.domain)
             subdomains = []
             
             with requests.Session() as client:
                 resp = client.get(url,timeout=self.timeout)
-                
                 if(resp.status_code == 200):
-                    soup = BeautifulSoup(resp.text, "html.parser")
-                    result = soup.find("table", {"class":"table"})
-                    tbody = result.find("tbody")
-                    links = tbody.find_all("a", {"rel":True, "target":True})
-                    for l in links:
-                        attrs = l.attrs
-                        if(attrs):
-                            href = attrs.get("href").replace("//", "", len(attrs))
-                            subdomains.append(href)
-
-            return subdomains 
+                    subdomains = resp.json()
+            return list(set(subdomains)) 
             
         except Exception as e:
-            print("[Knockpy riddler ERROR]", e, flush=True)
+            print("[Knockpy api_subdomain_center ERROR]", e, flush=True)
             return []
             
     def urlscan(self):
@@ -568,23 +567,52 @@ class KnockPYSync(KnockPY):
             print("[Knockpy urlscan ERROR]", e, flush=True)
             return []
             
+    def crt(self):
+        """@return List"""
+        try:
+            url = "https://crt.sh/json?q={domain}".format(domain=self.domain)
+            subdomains = set()
+            
+            with requests.Session() as client:
+                req = client.get(url, timeout=10)
+                if(req.status_code == 200):
+                    data = req.json()
+                    
+                    for entry in data:
+                        name_value = entry.get('name_value', '')
+                        for sub in name_value.split('\n'):
+                            sub = self._clean_name(sub.strip().lower())
+                            if(not sub):
+                                continue 
+                                
+                            # Skip wildcard entries and empty strings
+                            if self._is_subdomain(sub, self.domain, False):
+                                # Remove any wildcard prefix if present at beginning
+                                subdomains.add(sub)
+                
+            return sorted(subdomains)
+        
+        except Exception as e:
+            print("[Knockpy crt ERROR]", e, flush=True)
+            return []
+            
     def search(self, resolve=False, return_dict=True):
         subdomains = []
         
         print("Searching urlscan")
         subdomains = self.urlscan()
         
-        print("Searching riddler")
-        subdomains = self.riddler()
+        print("Searching api_subdomain_center")
+        subdomains = self.api_subdomain_center()
         
         print("Searching waybackurl")
         subdomains = self.waybackurl()
         
-        print("Searching binary_edge")
-        binary_subdomains = self.binary_edge()
+        print("Searching crt")
+        crt_subdomains = self.crt()
         
-        if binary_subdomains:
-            subdomains += binary_subdomains
+        if crt_subdomains:
+            subdomains += crt_subdomains
             
         print("Searching virustotal")
         subdomains += self.virustotal()
