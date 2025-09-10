@@ -257,7 +257,40 @@ class KnockPY(object):
         except Exception as e:
             print("[Knockpy urlscan ERROR]", e, flush=True)
             return []
+    
+    async def dnsrepo(self) -> list[str]:
+        try:
+            url = f"https://dnsrepo.noc.org/?search={self.domain}"
             
+            async with httpx.AsyncClient(verify=False) as client:
+                resp = await client.get(url,  timeout=self.timeout)
+                if resp.status_code != 200:
+                    print(f"[DNSRepo] status code {resp.status_code}")
+                    return []
+                return self.extract_domains(resp.text)
+           
+        except Exception as e:
+            print("[Knockpy DNSRepo ERROR]", e, flush=True)
+            return []
+    
+    def extract_domains(self, resp: str) -> list[str]:
+        soup = BeautifulSoup(resp, "html.parser")
+        table = soup.find("table", class_="table")
+        found_subdomains = set()
+        if table:
+            rows = table.find("tbody").find_all("tr")
+            for row in rows:
+                cols = row.find_all("td")
+                if cols:
+                    domain_cell = cols[0]
+                    a_tag = domain_cell.find("a")
+                    if a_tag:
+                        subdomain = a_tag.get_text(strip=True).replace('\n', '').replace('\r', '')
+                        subdomain = subdomain.rstrip('.')
+                        if subdomain.endswith(self.domain) and subdomain != self.domain:
+                            found_subdomains.add(subdomain)
+        return sorted(list(found_subdomains))
+        
     async def search(self, resolve=False, return_dict=True):
         subdomains = []
         
@@ -287,6 +320,9 @@ class KnockPY(object):
         
         print("project hackertarget")
         subdomains += await self.hackertarget()
+        
+        print("project dnsrepo")
+        subdomains += await self.dnsrepo()
         
         if not resolve and not return_dict:
             print("Returning nothing")
@@ -595,6 +631,21 @@ class KnockPYSync(KnockPY):
         except Exception as e:
             print("[Knockpy crt ERROR]", e, flush=True)
             return []
+    
+    def dnsrepo(self) -> list[str]:
+        try:
+            url = f"https://dnsrepo.noc.org/?search={self.domain}"
+            
+            with requests.Session() as client:
+                resp = client.get(url, timeout=self.timeout)
+                if resp.status_code != 200:
+                    print(f"[DNSRepo] status code {resp.status_code}")
+                    return []
+                return self.extract_domains(resp.text)
+           
+        except Exception as e:
+            print("[Knockpy DNSRepo ERROR]", e, flush=True)
+            return []
             
     def search(self, resolve=False, return_dict=True):
         subdomains = []
@@ -625,6 +676,9 @@ class KnockPYSync(KnockPY):
         
         print("project hackertarget")
         subdomains += self.hackertarget()
+        
+        print("project hackertarget")
+        subdomains += self.dnsrepo()
         
         if not resolve and not return_dict:
             print("Returning nothing")
