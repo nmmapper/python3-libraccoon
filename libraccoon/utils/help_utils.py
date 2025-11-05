@@ -132,7 +132,7 @@ class HelpUtilities:
 
     @classmethod
     def query_dns_dumpster(cls, host):
-        # Start DNS Dumpster session for the token
+         # Start DNS Dumpster session for the token
         request_handler = RequestHandler()
         dnsdumpster_session = request_handler.get_new_session()
         url = "https://dnsdumpster.com"
@@ -142,25 +142,25 @@ class HelpUtilities:
             target = host.target
         payload = {
             "targetip": target,
-            "csrfmiddlewaretoken": None,
-            "user":"free"
+            "csrfmiddlewaretoken": None
         }
         try:
-            dnsdumpster_session.get(url)
+            print("URL ", url)
+            dnsdumpster_session.get(url, timeout=10)
             jar = dnsdumpster_session.cookies
-            
             for c in jar:
                 if not c.__dict__.get("name") == "csrftoken":
                     continue
                 payload["csrfmiddlewaretoken"] = c.__dict__.get("value")
                 break
-         
-            ret = dnsdumpster_session.post(url, data=payload, headers={"Referer": "https://dnsdumpster.com/"})
-            return ret
-            
-        except ConnectionError as e:
-            raise RaccoonException
+            print("URL ", url)
+            print("PAYLOAD ", payload)
+            dnsdumpster_session.post(url, data=payload, headers={"Referer": "https://dnsdumpster.com/"})
 
+            return dnsdumpster_session.get("https://dnsdumpster.com/static/map/{}.png".format(target))
+        except ConnectionError:
+            raise RaccoonException
+            
     @classmethod
     def extract_hosts_from_cidr(cls):
         pass

@@ -9,6 +9,9 @@ import socket
 import re
 from libraccoon.utils.utils import get_asn
 from libraccoon.utils.utils import get_ips
+import httpx
+from typing import List, Dict, Optional, Any
+import json 
 
 class SubDomainEnumerator(object):
 
@@ -31,12 +34,19 @@ class SubDomainEnumerator(object):
         self.request_handler = RequestHandler(ua=self.ua)
         
         self.subdomainlist = []
+        self.url = 'https://dnsdumpster.com/'
+        self.api = "https://api.dnsdumpster.com/"
+        self.headers = {
+            "User-Agent": self.ua,
+        }
+        self.timeout: int = 10
+        self.domain = self.target 
         
     async def run(self):
         print("Enumerating Subdomains")
         if self.sans:
             self._extract_from_sans()
-        self._extract_from_dns_dumpster()
+        await self._extract_from_dns_dumpster()
         if not self.no_sub_enum:
             self.bruteforce()
         print("Done enumerating Subdomains")
@@ -77,17 +87,70 @@ class SubDomainEnumerator(object):
         for san in self.sans:
             if (tld_less in san or domain in san) and self.target != san and not san.startswith("*"):
                 print("Subdomain detected: {0}".format(san))
+    
+    def extract_domains(self, resp: str) -> List[str]:
+        reg_hosts = re.compile(r'[a-zA-Z0-9.-]*\.' + re.escape(self.domain))
+        results = reg_hosts.findall(resp)
+        
+        reg_hosts = re.compile(r'[a-zA-Z0-9.-]*\.' + re.escape(self.domain.replace('www.', '')))
+        results = reg_hosts.findall(resp)
+        subdomains = self.unique(results)
+        return subdomains
 
-    def _extract_from_dns_dumpster(self):
+    def get_forms_data(self, resp: str) -> Dict[str, str]:
+        soup = BeautifulSoup(resp, 'html.parser')
+        form = soup.find('form')
+        hx_post = form.get('hx-post')
+        hx_headers = form.get('hx-headers')
+        if not hx_headers:
+            print("[DNSdumpster] hx-headers not found")
+            return {}
+        hx_headers = json.loads(hx_headers)
+        return {
+            "hx_post": hx_post,
+            "Authorization": hx_headers.get("Authorization")
+        }
+    
+    def unique(self, result: List[str]) -> List[str]:
+        return list(set(result))
+        
+    async def _extract_from_dns_dumpster(self):
         print("Trying to extract subdomains from DNS dumpster")
         try:
-            page = HelpUtilities.query_dns_dumpster(host=self.host)
-            reg_hosts = re.compile(r'[a-zA-Z0-9.-]*\.' + self.host.target)
-            results = reg_hosts.findall(page.text)
-            self.subdomainlist = self.unique(results)
+            self.domain = self.host.naked 
+            if not self.domain:
+                self.domain = self.host.target 
+                
+            sublist = []
+            async with httpx.AsyncClient(verify=False) as client:
+                resp = await client.get(self.url, headers=self.headers, timeout=self.timeout)
+                if resp.status_code != 200:
+                    return []
+                
+                form_data = self.get_forms_data(resp.text)
+                if not form_data:
+                    print("[DNSdumpster] form data not found")
+                    return []
+
+                self.headers.update({
+                    "Origin": self.url,
+                    "Referer": self.url,
+                    'HX-Current-URL': self.url,
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Authorization": form_data.get("Authorization"),
+                    "Host": 'api.dnsdumpster.com',
+                })
+
+                resp = await client.post(form_data.get("hx_post"), headers=self.headers, data={'target': self.domain})
+                if resp.status_code != 200:
+                    print(f"[DNSdumpster] status code {resp.status_code}")
+                    return []
+                
+                self.subdomainlist = self.extract_domains(resp.text)
             return self.subdomainlist
-        
-        except (RaccoonException, IndexError):
+            
+        except Exception as e: # (RaccoonException, IndexError):
+            raise 
             print("Failed to query DNS dumpster for subdomains")
     
     def unique(self, result) -> list:

@@ -1,5 +1,5 @@
 import aiodns
-import simplejson as json
+import json
 import whois 
 
 class DNSHandler(object):
