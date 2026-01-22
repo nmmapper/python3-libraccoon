@@ -10,7 +10,7 @@ _VersionInfo = collections.namedtuple("WhatWebVersion", ['major', 'minor', 'micr
 _whatweb_search_path = ('/usr/bin/whatweb', '/usr/local/bin/whatweb', '/opt/local/bin/whatweb')
 
 regex_warning = re.compile('^Warning: .*', re.IGNORECASE)
-regex_whatweb_banner = re.compile('WhatWeb version ([0-9]+)\.([0-9]+)(?:\.([0-9])+)[^ ]* \( https?://.* \)')
+regex_whatweb_banner = re.compile(r'WhatWeb version (\d+)\.(\d+)(?:\.(\d+))?[^ ]* \( https?://.* \)')
 
 class WhatWeb(object):
     def __init__(self, exe_search_path = _whatweb_search_path):
@@ -26,14 +26,17 @@ class WhatWeb(object):
         for whatweb_path in self._search_path:
             proc = None
             try:
-                command = whatweb_path + ' --version'
-                shlexed = shlex.split(command)
-                proc = subprocess.Popen(shlexed, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                result = subprocess.run(
+                    [whatweb_path, '--version'], 
+                    capture_output=True, 
+                    text=True, 
+                    timeout=10
+                )
                 
                 while True:
-                    line = proc.stdout.readline()
-                    line = line.decode('utf8')
+                    line = result.stdout or ""
                     match_info = regex_whatweb_banner.match(line)
+                    
                     if match_info is None:
                         continue
                     is_found = True
@@ -77,8 +80,13 @@ class WhatWeb(object):
         proc = None
         try:
             args.insert(0, self._whatweb_path)
-            process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            whatweb_output, whatweb_err = process.communicate()
+            process = subprocess.run(
+                args,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            whatweb_output = process.stdout
         except:
             raise
         finally:
@@ -91,7 +99,6 @@ class WhatWeb(object):
                 
         if whatweb_output:
             try:
-                whatweb_output = whatweb_output.decode('utf8')
                 return json.loads(whatweb_output)
             except json.JSONDecodeError as e:
                 print("JSON DECODE ERROR", e)
@@ -141,7 +148,7 @@ class WhatWebAsync(WhatWeb):
             scan_args = arguments
         else:
             scan_args = ''
-        return '--log-json=- -q ' + targets + scan_args
+        return ['--log-json=-',  '-q', targets] # + scan_args]
         
     async def _scan_proc(self, args):
         proc = None
@@ -152,8 +159,7 @@ class WhatWebAsync(WhatWeb):
                         self._whatweb_path = path 
                         break 
             
-            cmd = "{cmd} {args}".format(cmd=self._whatweb_path, args=args)
-            process = await asyncio.create_subprocess_shell(cmd,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE)
+            process = await asyncio.create_subprocess_exec(self._whatweb_path, *args, stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE)
             whatweb_output, whatweb_err = await  process.communicate()
             
         except Exception as e:
