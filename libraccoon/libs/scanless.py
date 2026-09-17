@@ -242,6 +242,7 @@ class Scanless(object):
 
                             data.append(
                                 {
+									'host':self.hostname,
                                     "port": port,
                                     "protocol": protocol,
                                     "state": state,
