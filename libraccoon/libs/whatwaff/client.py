@@ -1,7 +1,6 @@
 import httpx
 from typing import Optional
 
-
 class AsyncHTTPClient:
     def __init__(self, timeout: int = 10) -> None:
         self.timeout = timeout

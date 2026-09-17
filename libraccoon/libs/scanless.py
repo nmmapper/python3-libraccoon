@@ -229,38 +229,28 @@ class Scanless(object):
                 ret = await client.get(BASE_URL, timeout=self.timeout)
                 if(ret.status_code == 200):
                     soup = bs4.BeautifulSoup(ret.text, "html.parser")
-                    table, rows = soup.find("table"), soup.findAll("tr") 
+                    rows = soup.find("tbody").find_all("tr")
                     
-                    for tr, port in zip(rows[7:22], ports):
-                        tmp_data = {}
-                        
-                        port = re.search(port_pattern, str(tr))
-                        if(port):
-                            port = port.group().replace("</td>", "").replace("<td>", "")
-                            tmp_data["port"]=port
-                        else:
-                            print("Missing port ", tr)
-                        
-                        service = re.search(service_pattern, str(tr))
-                        if(service):
-                            service = service.group().replace("</td>", "").replace("<td>", "")
-                            tmp_data["service"]=service.lower()
-                        else:
-                            #Missing service <tr><td>110</td><td>POP3</td><td><center><img alt="closed" height="20" src="/images/error.GIF"/></center></td></tr>
-                            #Missing service <tr><td>3389</td><td>Remote Desktop</td><td><center><img alt="closed" height="20" src="/images/error.GIF"/></center></td></tr>
-                            print("Missing service", tr)
-                            
-                        cols = str(tr.findAll("td"))
-                        if "error.GIF" in cols:
-                            tmp_data["state"]='closed'
-                        else:
-                            tmp_data["state"]='open'
-                        
-                        # Add protocol
-                        tmp_data["protocol"]="protocol"
-                        
-                        # Put inside a list
-                        data.append(tmp_data)
+                    for tr in rows:
+                        cols = tr.find_all("td")
+                        if len(cols) >= 4:
+                            # Extract and clean text from each cell
+                            port = cols[0].get_text(strip=True)
+                            protocol = cols[1].get_text(strip=True)
+                            state = cols[2].get_text(strip=True)
+                            service = cols[3].get_text(strip=True)
+
+                            data.append(
+                                {
+                                    "port": port,
+                                    "protocol": protocol,
+                                    "state": state,
+                                    "service": service.lower(),
+                                }
+                            )
+
+                    return data
+                    
                 else:
                     msg = "STATUS Scanless method[viewdns] {status}".format(status=ret.status_code)
                     print(msg)
