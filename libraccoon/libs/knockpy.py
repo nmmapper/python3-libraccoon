@@ -4,6 +4,9 @@ from libraccoon.utils.utils import get_asn
 from libraccoon.utils.utils import get_ips
 from tld import get_tld
 from bs4 import BeautifulSoup
+from tld.exceptions import TldDomainNotFound, TldBadUrl
+import asyncio
+import json 
 
 class KnockPY(object):
     HACKER_TARGET = "https://api.hackertarget.com/hostsearch/?q={domain}"
@@ -21,7 +24,7 @@ class KnockPY(object):
         self.securitytrail = securitytrail
         self.binary_edge_api = binary_edge_api
         self.ua=ua
-        self.timeout = 5
+        self.timeout = 10
         
         if(not self.ua):
             self.ua = get_user_agent()
@@ -44,28 +47,43 @@ class KnockPY(object):
         return n
     
     async def waybackurl(self):
-        """@return List"""
+        """@return List[str]"""
         try:
-            url='https://web.archive.org/cdx/search/cdx?url={domain}&matchType=domain&fl=original&collapse=urlkey&limit=1000&output=json'.format(domain=self.domain)
-            subdomains = []
-            
+            url = f"https://web.archive.org/cdx/search/cdx?url={self.domain}&matchType=domain&fl=original&collapse=urlkey&limit=1000&output=json"
+            # 1. Use a set initially for O(1) deduplication instead of list conversion at the end
+            subdomains = set()
+
             async with httpx.AsyncClient() as client:
-                req = await client.get(url, timeout=self.timeout)
+                req = await client.get(url, timeout=15)
+                req.raise_for_status()  # 2. Catch 503/403 Wayback API errors before parsing JSON
                 data = req.json()
                 
+                # 3. The CDX API JSON output puts the column headers in the first array index
+                if data and data[0] == ["original"]:
+                    data = data[1:]
+                
                 for d in data:
-                    url = d[0]
-                    
-                    if("http" in url):
-                        tld = get_tld(url, as_object=True, fix_protocol=True)
+                    if not d:
+                        continue
                         
-                        if (tld.subdomain):
-                            sub = "{subdomain}.{tld}".format(subdomain=tld.subdomain, tld=tld.fld)
-                            subdomains.append(sub)
+                    target_url = d[0]
+                    
+                    if target_url.startswith("http"):
+                        try:
+                            # 4. Wrap in try/except: A single malformed historical URL shouldn't crash the loop
+                            tld_info = get_tld(target_url, as_object=True, fix_protocol=True)
+                            
+                            if tld_info.subdomain:
+                                sub = f"{tld_info.subdomain}.{tld_info.fld}"
+                                subdomains.add(sub)
+                        except (TldDomainNotFound, TldBadUrl):
+                            continue
             
-            return list(set(subdomains))
+            return list(subdomains)
+        
         except Exception as e:
-            print("[Knockpy waybackurl ERROR]", e, flush=True)
+            # 5. Removed the rogue `raise` that was turning this and the return into dead code
+            print(f"[Knockpy waybackurl ERROR] {e}", flush=True)
             return []
     
     async def virustotal_subdomain(self):
@@ -190,50 +208,88 @@ class KnockPY(object):
             print("[Knockpy securitytrails ERROR]", e, flush=True)
             return []
             
+
+
     async def crt(self):
-        """@return List"""
-        try:
-            url = "https://crt.sh/json?q={domain}".format(domain=self.domain)
-            subdomains = set()
-            
-            async with httpx.AsyncClient() as client:
-                req = await client.get(url, timeout=10)
-                if(req.status_code == 200):
-                    data = req.json()
-                    
-                    for entry in data:
-                        name_value = entry.get('name_value', '')
-                        for sub in name_value.split('\n'):
-                            sub = self._clean_name(sub.strip().lower())
-                            if(not sub):
-                                continue 
-                                
-                            # Skip wildcard entries and empty strings
-                            if self._is_subdomain(sub, self.domain, False):
-                                # Remove any wildcard prefix if present at beginning
-                                subdomains.add(sub)
-                
-            return sorted(subdomains)
+        """@return List[str]"""
+        # 1. Base setup
+        url = f"https://crt.sh/json?q=%.{self.domain}"
+        subdomains = set()
+        timeout_val = getattr(self, 'timeout', 15)
         
-        except Exception as e:
-            print("[Knockpy crt ERROR]", e, flush=True)
-            return []
-            
-    async def api_subdomain_center(self):
-        """@return List"""
-        try:
-            url = "https://api.subdomain.center/?domain={domain}".format(domain=self.domain)
-            subdomains = []
-            
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(url,timeout=self.timeout)
-                if(resp.status_code == 200):
-                    subdomains = resp.json()
-            return list(set(subdomains)) 
-            
-        except Exception as e:
-            print("[Knockpy api_subdomain_center ERROR]", e, flush=True)
-            return []
+        # 2. Configure retry limits
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            try:
+                async with httpx.AsyncClient() as client:
+                    req = await client.get(url, timeout=timeout_val)
+                    req.raise_for_status()
+                    
+                    try:
+                        data = req.json()
+                    except json.JSONDecodeError:
+                        return []
+                    
+                    if isinstance(data, list):
+                        for entry in data:
+                            name_value = entry.get('name_value', '')
+                            for sub in name_value.split('\n'):
+                                sub = sub.strip().lower()
+                                
+                                if sub.startswith('*.'):
+                                    sub = sub[2:]
+                                sub = self._clean_name(sub)
+                                
+                                if not sub:
+                                    continue 
+                                    
+                                if self._is_subdomain(sub, self.domain, False):
+                                    subdomains.add(sub)
+                                    
+                    return sorted(list(subdomains))
+
+            except httpx.HTTPStatusError as e:
+                # 3. Catch proxy/gateway errors from crt.sh explicitly
+                if e.response.status_code in (502, 503, 504) and attempt < max_retries - 1:
+                    wait_time = 2 ** attempt  # Backoff: 1s, 2s, 4s...
+                    print(f"[Knockpy crt WARNING] crt.sh returned {e.response.status_code}. Retrying in {wait_time}s...", flush=True)
+                    await asyncio.sleep(wait_time)
+                    continue
+                
+                # Bubble up if out of retries or if it's a 4xx error (e.g., 400 Bad Request)
+                raise e
+                
+            except httpx.RequestError as e:
+                # 4. Handle client-side connection drops or read timeouts
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt
+                    print(f"[Knockpy crt WARNING] crt.sh connection error. Retrying in {wait_time}s...", flush=True)
+                    await asyncio.sleep(wait_time)
+                    continue
+                    
+                raise e
+
+            except Exception as e:
+                # Catch-all for our original try/except wrapper
+                print(f"[Knockpy crt ERROR] {e}", flush=True)
+                return []
+                
+        async def api_subdomain_center(self):
+            """@return List"""
+            try:
+                url = "https://api.subdomain.center/?domain={domain}".format(domain=self.domain)
+                subdomains = []
+                
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(url,timeout=self.timeout)
+                    if(resp.status_code == 200):
+                        subdomains = resp.json()
+                return list(set(subdomains)) 
+                
+            except Exception as e:
+                print("[Knockpy api_subdomain_center ERROR]", e, flush=True)
+                return []
             
     async def urlscan(self):
         """@return List"""
@@ -269,6 +325,32 @@ class KnockPY(object):
                     return []
                 return self.extract_domains(resp.text)
            
+        except Exception as e:
+            print("[Knockpy DNSRepo ERROR]", e, flush=True)
+            return []
+            
+    async def ip_thc(self) -> list[str]:
+        try:
+            url = "https://ip.thc.org/api/v1/lookup/subdomains"
+            subdomains: list = []
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                res = await client.post(
+                    url,
+                    json={"domain": self.domain, "page_state": "", "limit": 10},
+                    headers={'Accept': 'application/json'}
+                )
+                res.raise_for_status()
+                domains = res.json()
+                if(domains):
+                    domains = domains.get('domains')
+                    
+                    for d in domains:
+                        if d.get('domain') != self.domain:
+                            subdomains.append(d.get('domain'))
+                            
+            return subdomains
+            
         except Exception as e:
             print("[Knockpy DNSRepo ERROR]", e, flush=True)
             return []
@@ -395,28 +477,43 @@ class KnockPYSync(KnockPY):
     def waybackurl(self):
         """@return List"""
         try:
-            url='https://web.archive.org/cdx/search/cdx?url={domain}&matchType=domain&fl=original&collapse=urlkey&limit=1000&output=json'.format(domain=self.domain)
-            subdomains = []
-            
+            url = f"https://web.archive.org/cdx/search/cdx?url={self.domain}&matchType=domain&fl=original&collapse=urlkey&limit=1000&output=json"
+            # 1. Use a set initially for O(1) deduplication instead of list conversion at the end
+            subdomains = set()
+
             with requests.Session() as client:
-                req = client.get(url, timeout=self.timeout)
+                req = client.get(url, timeout=15)
+                req.raise_for_status()  # 2. Catch 503/403 Wayback API errors before parsing JSON
                 data = req.json()
                 
+                # 3. The CDX API JSON output puts the column headers in the first array index
+                if data and data[0] == ["original"]:
+                    data = data[1:]
+                
                 for d in data:
-                    url = d[0]
-                    
-                    if("http" in url):
-                        tld = get_tld(url, as_object=True, fix_protocol=True)
+                    if not d:
+                        continue
                         
-                        if (tld.subdomain):
-                            sub = "{subdomain}.{tld}".format(subdomain=tld.subdomain, tld=tld.fld)
-                            subdomains.append(sub)
+                    target_url = d[0]
+                    
+                    if target_url.startswith("http"):
+                        try:
+                            # 4. Wrap in try/except: A single malformed historical URL shouldn't crash the loop
+                            tld_info = get_tld(target_url, as_object=True, fix_protocol=True)
+                            
+                            if tld_info.subdomain:
+                                sub = f"{tld_info.subdomain}.{tld_info.fld}"
+                                subdomains.add(sub)
+                        except (TldDomainNotFound, TldBadUrl):
+                            continue
             
-            return list(set(subdomains))
+            return list(subdomains)
+        
         except Exception as e:
-            print("[Knockpy waybackurl ERROR]", e, flush=True)
+            # 5. Removed the rogue `raise` that was turning this and the return into dead code
+            print(f"[Knockpy waybackurl ERROR] {e}", flush=True)
             return []
-    
+       
     def virustotal_subdomain(self):
         try:
             if not self.virustotalapi:
@@ -643,6 +740,29 @@ class KnockPYSync(KnockPY):
                     return []
                 return self.extract_domains(resp.text)
            
+        except Exception as e:
+            print("[Knockpy DNSRepo ERROR]", e, flush=True)
+            return []
+    
+    def ip_thc(self) -> list[str]:
+        try:
+            url = "https://ip.thc.org/api/v1/lookup/subdomains"
+            subdomains: list = []
+            
+            with requests.Session() as client:
+                res = client.post(url, timeout=self.timeout, headers={'Accept': 'application/json'}, data=json.dumps({"domain": self.domain, "page_state": "", "limit": 10}))
+                res.raise_for_status()
+                domains = res.json()
+                
+                if(domains):
+                    domains = domains.get('domains')
+                    
+                    for d in domains:
+                        if d.get('domain') != self.domain:
+                            subdomains.append(d.get('domain'))
+                            
+            return subdomains
+            
         except Exception as e:
             print("[Knockpy DNSRepo ERROR]", e, flush=True)
             return []
