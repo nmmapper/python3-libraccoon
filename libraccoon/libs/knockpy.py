@@ -275,22 +275,22 @@ class KnockPY(object):
                 print(f"[Knockpy crt ERROR] {e}", flush=True)
                 return []
                 
-        async def api_subdomain_center(self):
-            """@return List"""
-            try:
-                url = "https://api.subdomain.center/?domain={domain}".format(domain=self.domain)
-                subdomains = []
-                
-                async with httpx.AsyncClient() as client:
-                    resp = await client.get(url,timeout=self.timeout)
-                    if(resp.status_code == 200):
-                        subdomains = resp.json()
-                return list(set(subdomains)) 
-                
-            except Exception as e:
-                print("[Knockpy api_subdomain_center ERROR]", e, flush=True)
-                return []
+    async def api_subdomain_center(self):
+        """@return List"""
+        try:
+            url = "https://api.subdomain.center/?domain={domain}".format(domain=self.domain)
+            subdomains = []
             
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(url,timeout=self.timeout)
+                if(resp.status_code == 200):
+                    subdomains = resp.json()
+            return list(set(subdomains)) 
+            
+        except Exception as e:
+            print("[Knockpy api_subdomain_center ERROR]", e, flush=True)
+            return []
+        
     async def urlscan(self):
         """@return List"""
         try:
