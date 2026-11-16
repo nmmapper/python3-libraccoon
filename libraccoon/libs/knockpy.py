@@ -55,7 +55,7 @@ class KnockPY(object):
 
             async with httpx.AsyncClient() as client:
                 req = await client.get(url, timeout=15)
-                req.raise_for_status()  # 2. Catch 503/403 Wayback API errors before parsing JSON
+                #req.raise_for_status()  # 2. Catch 503/403 Wayback API errors before parsing JSON
                 data = req.json()
                 
                 # 3. The CDX API JSON output puts the column headers in the first array index
@@ -208,8 +208,6 @@ class KnockPY(object):
             print("[Knockpy securitytrails ERROR]", e, flush=True)
             return []
             
-
-
     async def crt(self):
         """@return List[str]"""
         # 1. Base setup
@@ -224,7 +222,7 @@ class KnockPY(object):
             try:
                 async with httpx.AsyncClient() as client:
                     req = await client.get(url, timeout=timeout_val)
-                    req.raise_for_status()
+                    #req.raise_for_status()
                     
                     try:
                         data = req.json()
@@ -257,8 +255,8 @@ class KnockPY(object):
                     await asyncio.sleep(wait_time)
                     continue
                 
-                # Bubble up if out of retries or if it's a 4xx error (e.g., 400 Bad Request)
-                raise e
+                # No room for failure, return what we have or just empty list
+                return sorted(list(subdomains))
                 
             except httpx.RequestError as e:
                 # 4. Handle client-side connection drops or read timeouts
@@ -267,8 +265,9 @@ class KnockPY(object):
                     print(f"[Knockpy crt WARNING] crt.sh connection error. Retrying in {wait_time}s...", flush=True)
                     await asyncio.sleep(wait_time)
                     continue
-                    
-                raise e
+                
+                # No room for failure
+                return sorted(list(subdomains))
 
             except Exception as e:
                 # Catch-all for our original try/except wrapper
@@ -340,7 +339,7 @@ class KnockPY(object):
                     json={"domain": self.domain, "page_state": "", "limit": 10},
                     headers={'Accept': 'application/json'}
                 )
-                res.raise_for_status()
+                #res.raise_for_status()
                 domains = res.json()
                 if(domains):
                     domains = domains.get('domains')
@@ -405,6 +404,9 @@ class KnockPY(object):
         
         print("project dnsrepo")
         subdomains += await self.dnsrepo()
+        
+        print("project ip_thc")
+        subdomains += await self.ip_thc()
         
         if not resolve and not return_dict:
             print("Returning nothing")
@@ -483,7 +485,7 @@ class KnockPYSync(KnockPY):
 
             with requests.Session() as client:
                 req = client.get(url, timeout=15)
-                req.raise_for_status()  # 2. Catch 503/403 Wayback API errors before parsing JSON
+                #req.raise_for_status()  # 2. Catch 503/403 Wayback API errors before parsing JSON
                 data = req.json()
                 
                 # 3. The CDX API JSON output puts the column headers in the first array index
@@ -751,7 +753,7 @@ class KnockPYSync(KnockPY):
             
             with requests.Session() as client:
                 res = client.post(url, timeout=self.timeout, headers={'Accept': 'application/json'}, data=json.dumps({"domain": self.domain, "page_state": "", "limit": 10}))
-                res.raise_for_status()
+                #res.raise_for_status()
                 domains = res.json()
                 
                 if(domains):
@@ -799,6 +801,9 @@ class KnockPYSync(KnockPY):
         
         print("project hackertarget")
         subdomains += self.dnsrepo()
+        
+        print("project ip_thc")
+        subdomains += self.ip_thc()
         
         if not resolve and not return_dict:
             print("Returning nothing")
